@@ -1,0 +1,146 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+---
+
+<AdminLayout title="Dashboard">
+  <div class="space-y-6">
+    <!-- Header -->
+    <div>
+      <h1 class="text-2xl font-semibold text-foreground">Dashboard</h1>
+      <p class="text-muted-foreground text-sm mt-1">
+        Resumen del sistema de recategorización
+      </p>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-muted-foreground">
+            Período Activo
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-2xl font-bold text-foreground">2026-1</p>
+          <p class="text-xs text-muted-foreground mt-1">Enero - Junio 2026</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-muted-foreground">
+            Períodos Configurados
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-2xl font-bold text-foreground">3</p>
+          <p class="text-xs text-muted-foreground mt-1">Con escalas y cuotas</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-muted-foreground">
+            Estudios Activos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-2xl font-bold text-foreground">5</p>
+          <p class="text-xs text-muted-foreground mt-1">Con acceso al sistema</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-muted-foreground">
+            Clientes Totales
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-2xl font-bold text-foreground">247</p>
+          <p class="text-xs text-muted-foreground mt-1">Monotributistas registrados</p>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-base">Acciones Rápidas</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-2">
+          <a
+            href="/admin/periods"
+            class="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="font-medium text-foreground group-hover:text-primary transition-colors">Gestionar Períodos</p>
+              <p class="text-xs text-muted-foreground">Crear o editar períodos de recategorización</p>
+            </div>
+          </a>
+
+          <a
+            href="/admin/scales"
+            class="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div class="w-8 h-8 rounded-lg bg-chart-2/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-chart-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="font-medium text-foreground group-hover:text-chart-2 transition-colors">Actualizar Escalas</p>
+              <p class="text-xs text-muted-foreground">Modificar límites por categoría</p>
+            </div>
+          </a>
+
+          <a
+            href="/admin/fees"
+            class="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div class="w-8 h-8 rounded-lg bg-chart-4/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-chart-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2zM10 8.5a.5.5 0 11-1 0 .5.5 0 011 0zm5 5a.5.5 0 11-1 0 .5.5 0 011 0z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="font-medium text-foreground group-hover:text-chart-4 transition-colors">Componentes de Cuota</p>
+              <p class="text-xs text-muted-foreground">Impositivo, jubilatorio, OS, IIBB</p>
+            </div>
+          </a>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-base">Estado del Sistema</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">Escalas configuradas</span>
+            <span class="text-sm font-medium text-emerald-600">✓ Completo</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">Cuotas configuradas</span>
+            <span class="text-sm font-medium text-emerald-600">✓ Completo</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">IIBB provincial</span>
+            <span class="text-sm font-medium text-emerald-600">✓ 24 provincias</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-muted-foreground">Última actualización</span>
+            <span class="text-sm font-medium text-foreground">14/01/2026</span>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+</AdminLayout>

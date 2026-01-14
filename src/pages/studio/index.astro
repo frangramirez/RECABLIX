@@ -1,0 +1,164 @@
+---
+import StudioLayout from '@/layouts/StudioLayout.astro'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+---
+
+<StudioLayout title="Dashboard">
+  <div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-semibold text-foreground">Dashboard</h1>
+        <p class="text-muted-foreground text-sm mt-1">
+          Bienvenido a tu panel de recategorización
+        </p>
+      </div>
+      <a href="/studio/clients/new">
+        <Button>
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Nuevo Cliente
+        </Button>
+      </a>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-muted-foreground">
+            Mis Clientes
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-3xl font-bold text-foreground">42</p>
+          <p class="text-xs text-muted-foreground mt-1">Monotributistas activos</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-muted-foreground">
+            Período Activo
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-3xl font-bold text-foreground">2026-1</p>
+          <p class="text-xs text-muted-foreground mt-1">Enero - Junio 2026</p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader class="pb-2">
+          <CardTitle class="text-sm font-medium text-muted-foreground">
+            Pendientes de Reca
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p class="text-3xl font-bold text-amber-500">8</p>
+          <p class="text-xs text-muted-foreground mt-1">Requieren recategorización</p>
+        </CardContent>
+      </Card>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-base">Acciones Rápidas</CardTitle>
+        </CardHeader>
+        <CardContent class="space-y-2">
+          <a
+            href="/studio/clients"
+            class="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div class="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="font-medium text-foreground group-hover:text-primary transition-colors">Ver Clientes</p>
+              <p class="text-xs text-muted-foreground">Gestionar monotributistas</p>
+            </div>
+          </a>
+
+          <a
+            href="/studio/recategorization"
+            class="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div class="w-8 h-8 rounded-lg bg-chart-2/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-chart-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="font-medium text-foreground group-hover:text-chart-2 transition-colors">Recategorización</p>
+              <p class="text-xs text-muted-foreground">Ver resultados del período</p>
+            </div>
+          </a>
+
+          <a
+            href="/studio/clients/import"
+            class="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors group"
+          >
+            <div class="w-8 h-8 rounded-lg bg-chart-4/10 flex items-center justify-center">
+              <svg class="w-4 h-4 text-chart-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <div class="flex-1">
+              <p class="font-medium text-foreground group-hover:text-chart-4 transition-colors">Importar Excel</p>
+              <p class="text-xs text-muted-foreground">Cargar clientes masivamente</p>
+            </div>
+          </a>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle class="text-base">Resumen por Categoría</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">A</span>
+              <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                <div class="h-full bg-emerald-500 rounded-full" style="width: 25%"></div>
+              </div>
+              <span class="text-sm text-muted-foreground w-8 text-right">10</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold">B</span>
+              <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full" style="width: 35%"></div>
+              </div>
+              <span class="text-sm text-muted-foreground w-8 text-right">15</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded bg-violet-100 text-violet-700 flex items-center justify-center text-xs font-bold">C</span>
+              <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                <div class="h-full bg-violet-500 rounded-full" style="width: 20%"></div>
+              </div>
+              <span class="text-sm text-muted-foreground w-8 text-right">8</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="w-6 h-6 rounded bg-amber-100 text-amber-700 flex items-center justify-center text-xs font-bold">D+</span>
+              <div class="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                <div class="h-full bg-amber-500 rounded-full" style="width: 20%"></div>
+              </div>
+              <span class="text-sm text-muted-foreground w-8 text-right">9</span>
+            </div>
+          </div>
+          <div class="mt-4 pt-4 border-t border-border">
+            <a href="/studio/recategorization" class="text-sm text-primary hover:underline">
+              Ver detalle completo →
+            </a>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  </div>
+</StudioLayout>

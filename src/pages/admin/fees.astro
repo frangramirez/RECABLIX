@@ -1,0 +1,24 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { FeesManager } from '@/components/admin/FeesManager'
+import { createSupabaseServerClient } from '@/lib/supabase'
+
+const supabase = createSupabaseServerClient(Astro.cookies)
+const { data: periods } = await supabase
+  .from('reca_periods')
+  .select('id, code, year, semester')
+  .order('code', { ascending: false })
+---
+
+<AdminLayout title="Componentes de Cuota">
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold text-foreground">Componentes de Cuota</h1>
+      <p class="text-muted-foreground mt-1">
+        Configura los componentes de cuota por categoría: Impositivo, Jubilatorio,
+        Obra Social e Ingresos Brutos Provincial.
+      </p>
+    </div>
+    <FeesManager client:load periods={periods || []} />
+  </div>
+</AdminLayout>

@@ -1,15 +1,19 @@
--- EPIC-01-S10: Seeds con datos de ejemplo para RECABLIX
--- NOTA: Comparte BD con FINBLIX, usa tablas existentes cuando aplica
-
--- Limpiar solo datos de RECABLIX
-TRUNCATE public.reca_transactions, public.reca_client_data, public.reca_fee_components, public.reca_scales, public.reca_periods CASCADE;
+-- EPIC-01-S10: Datos iniciales para RECABLIX
+-- Migración idempotente: usa ON CONFLICT para evitar duplicados
 
 -- 1. Período de recategorización activo (RECA 261)
 INSERT INTO public.reca_periods (id, code, year, semester, sales_period_start, sales_period_end, fee_period_start, fee_period_end, is_active)
-VALUES
-  ('11111111-1111-1111-1111-111111111111', '261', 2026, 1, '202501', '202512', '202602', '202607', true);
+VALUES ('11111111-1111-1111-1111-111111111111', '261', 2026, 1, '202501', '202512', '202602', '202607', true)
+ON CONFLICT (code) DO UPDATE SET
+  year = EXCLUDED.year,
+  semester = EXCLUDED.semester,
+  sales_period_start = EXCLUDED.sales_period_start,
+  sales_period_end = EXCLUDED.sales_period_end,
+  fee_period_start = EXCLUDED.fee_period_start,
+  fee_period_end = EXCLUDED.fee_period_end,
+  is_active = EXCLUDED.is_active;
 
--- 2. Escalas para RECA 261
+-- 2. Escalas para RECA 261 (11 categorías A-K)
 INSERT INTO public.reca_scales (reca_id, category, max_annual_income, max_local_m2, max_annual_mw, max_annual_rent, max_unit_sale) VALUES
 ('11111111-1111-1111-1111-111111111111', 'A', 10206600.00, 30, 3330, 2373628.00, 609231.08),
 ('11111111-1111-1111-1111-111111111111', 'B', 14953850.00, 45, 5000, 2373628.00, 609231.08),
@@ -21,9 +25,15 @@ INSERT INTO public.reca_scales (reca_id, category, max_annual_income, max_local_
 ('11111111-1111-1111-1111-111111111111', 'H', 69626410.00, 200, 20000, 7120883.00, 609231.08),
 ('11111111-1111-1111-1111-111111111111', 'I', 77934110.00, 200, 20000, 7120883.00, 609231.08),
 ('11111111-1111-1111-1111-111111111111', 'J', 89248400.00, 200, 20000, 7120883.00, 609231.08),
-('11111111-1111-1111-1111-111111111111', 'K', 107604500.00, 200, 20000, 7120883.00, 609231.08);
+('11111111-1111-1111-1111-111111111111', 'K', 107604500.00, 200, 20000, 7120883.00, 609231.08)
+ON CONFLICT (reca_id, category) DO UPDATE SET
+  max_annual_income = EXCLUDED.max_annual_income,
+  max_local_m2 = EXCLUDED.max_local_m2,
+  max_annual_mw = EXCLUDED.max_annual_mw,
+  max_annual_rent = EXCLUDED.max_annual_rent,
+  max_unit_sale = EXCLUDED.max_unit_sale;
 
--- 3. Componentes Impositivo BIENES (B20)
+-- 3. Componentes: Impositivo BIENES (B20)
 INSERT INTO public.reca_fee_components (reca_id, component_code, description, component_type, category, value) VALUES
 ('11111111-1111-1111-1111-111111111111', 'B20', 'IMP-Bienes', 'IMP', 'A', 4747.251),
 ('11111111-1111-1111-1111-111111111111', 'B20', 'IMP-Bienes', 'IMP', 'B', 9019.788),
@@ -35,9 +45,12 @@ INSERT INTO public.reca_fee_components (reca_id, component_code, description, co
 ('11111111-1111-1111-1111-111111111111', 'B20', 'IMP-Bienes', 'IMP', 'H', 174066.018),
 ('11111111-1111-1111-1111-111111111111', 'B20', 'IMP-Bienes', 'IMP', 'I', 276923.213),
 ('11111111-1111-1111-1111-111111111111', 'B20', 'IMP-Bienes', 'IMP', 'J', 332307.865),
-('11111111-1111-1111-1111-111111111111', 'B20', 'IMP-Bienes', 'IMP', 'K', 399969.438);
+('11111111-1111-1111-1111-111111111111', 'B20', 'IMP-Bienes', 'IMP', 'K', 399969.438)
+ON CONFLICT (reca_id, component_code, category) DO UPDATE SET
+  value = EXCLUDED.value,
+  description = EXCLUDED.description;
 
--- Impositivo SERVICIOS (S20)
+-- 4. Componentes: Impositivo SERVICIOS (S20)
 INSERT INTO public.reca_fee_components (reca_id, component_code, description, component_type, category, value) VALUES
 ('11111111-1111-1111-1111-111111111111', 'S20', 'IMP-Servicios', 'IMP', 'A', 7596.402),
 ('11111111-1111-1111-1111-111111111111', 'S20', 'IMP-Servicios', 'IMP', 'B', 14231.660),
@@ -49,9 +62,12 @@ INSERT INTO public.reca_fee_components (reca_id, component_code, description, co
 ('11111111-1111-1111-1111-111111111111', 'S20', 'IMP-Servicios', 'IMP', 'H', 267230.176),
 ('11111111-1111-1111-1111-111111111111', 'S20', 'IMP-Servicios', 'IMP', 'I', 432384.397),
 ('11111111-1111-1111-1111-111111111111', 'S20', 'IMP-Servicios', 'IMP', 'J', 518861.284),
-('11111111-1111-1111-1111-111111111111', 'S20', 'IMP-Servicios', 'IMP', 'K', 622633.548);
+('11111111-1111-1111-1111-111111111111', 'S20', 'IMP-Servicios', 'IMP', 'K', 622633.548)
+ON CONFLICT (reca_id, component_code, category) DO UPDATE SET
+  value = EXCLUDED.value,
+  description = EXCLUDED.description;
 
--- Jubilatorio NO jubilado (021)
+-- 5. Componentes: Jubilatorio NO jubilado (021)
 INSERT INTO public.reca_fee_components (reca_id, component_code, description, component_type, category, value) VALUES
 ('11111111-1111-1111-1111-111111111111', '021', 'JUB-Aporta', 'JUB', 'A', 13663.17),
 ('11111111-1111-1111-1111-111111111111', '021', 'JUB-Aporta', 'JUB', 'B', 15029.48),
@@ -63,14 +79,20 @@ INSERT INTO public.reca_fee_components (reca_id, component_code, description, co
 ('11111111-1111-1111-1111-111111111111', '021', 'JUB-Aporta', 'JUB', 'H', 26625.65),
 ('11111111-1111-1111-1111-111111111111', '021', 'JUB-Aporta', 'JUB', 'I', 29288.21),
 ('11111111-1111-1111-1111-111111111111', '021', 'JUB-Aporta', 'JUB', 'J', 32217.03),
-('11111111-1111-1111-1111-111111111111', '021', 'JUB-Aporta', 'JUB', 'K', 35438.74);
+('11111111-1111-1111-1111-111111111111', '021', 'JUB-Aporta', 'JUB', 'K', 35438.74)
+ON CONFLICT (reca_id, component_code, category) DO UPDATE SET
+  value = EXCLUDED.value,
+  description = EXCLUDED.description;
 
--- Jubilatorio JUBILADO (21J)
+-- 6. Componentes: Jubilatorio JUBILADO (21J) - valor fijo para todas las categorías
 INSERT INTO public.reca_fee_components (reca_id, component_code, description, component_type, category, value)
 SELECT '11111111-1111-1111-1111-111111111111', '21J', 'JUB-Jubilado', 'JUB', cat, 13663.17
-FROM unnest(ARRAY['A','B','C','D','E','F','G','H','I','J','K']) AS cat;
+FROM unnest(ARRAY['A','B','C','D','E','F','G','H','I','J','K']) AS cat
+ON CONFLICT (reca_id, component_code, category) DO UPDATE SET
+  value = EXCLUDED.value,
+  description = EXCLUDED.description;
 
--- Obra Social (024)
+-- 7. Componentes: Obra Social (024)
 INSERT INTO public.reca_fee_components (reca_id, component_code, description, component_type, category, value) VALUES
 ('11111111-1111-1111-1111-111111111111', '024', 'Obra Social', 'OS', 'A', 31437.374),
 ('11111111-1111-1111-1111-111111111111', '024', 'Obra Social', 'OS', 'B', 31437.374),
@@ -82,22 +104,16 @@ INSERT INTO public.reca_fee_components (reca_id, component_code, description, co
 ('11111111-1111-1111-1111-111111111111', '024', 'Obra Social', 'OS', 'H', 50630.205),
 ('11111111-1111-1111-1111-111111111111', '024', 'Obra Social', 'OS', 'I', 55693.226),
 ('11111111-1111-1111-1111-111111111111', '024', 'Obra Social', 'OS', 'J', 61262.548),
-('11111111-1111-1111-1111-111111111111', '024', 'Obra Social', 'OS', 'K', 67388.803);
+('11111111-1111-1111-1111-111111111111', '024', 'Obra Social', 'OS', 'K', 67388.803)
+ON CONFLICT (reca_id, component_code, category) DO UPDATE SET
+  value = EXCLUDED.value,
+  description = EXCLUDED.description;
 
--- IIBB CABA (901) - $0
+-- 8. Componentes: IIBB CABA (901) - $0 para todas las categorías
 INSERT INTO public.reca_fee_components (reca_id, component_code, description, component_type, category, value, province_code, has_municipal)
 SELECT '11111111-1111-1111-1111-111111111111', '901', 'IIBB CABA', 'IBP', cat, 0, '901', false
-FROM unnest(ARRAY['A','B','C','D','E','F','G','H','I','J','K']) AS cat;
-
--- Verificación
-DO $$
-BEGIN
-  RAISE NOTICE 'Seeds RECABLIX completados:';
-  RAISE NOTICE '  - Períodos: %', (SELECT COUNT(*) FROM public.reca_periods);
-  RAISE NOTICE '  - Escalas: %', (SELECT COUNT(*) FROM public.reca_scales);
-  RAISE NOTICE '  - Componentes: %', (SELECT COUNT(*) FROM public.reca_fee_components);
-END $$;
-
--- NOTA: Los clientes y transacciones de prueba se deben crear después
--- usando la función add_recablix_to_client() para clientes existentes de FINBLIX
--- o creando clientes nuevos con el array apps incluido
+FROM unnest(ARRAY['A','B','C','D','E','F','G','H','I','J','K']) AS cat
+ON CONFLICT (reca_id, component_code, category) DO UPDATE SET
+  value = EXCLUDED.value,
+  province_code = EXCLUDED.province_code,
+  has_municipal = EXCLUDED.has_municipal;

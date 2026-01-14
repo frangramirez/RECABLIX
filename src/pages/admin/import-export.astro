@@ -1,0 +1,16 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { ImportExportManager } from '@/components/admin/ImportExportManager'
+---
+
+<AdminLayout title="Import/Export">
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold text-foreground">Importar / Exportar Datos</h1>
+      <p class="text-muted-foreground mt-1">
+        Exporta e importa configuraciones de períodos, escalas y componentes de cuota.
+      </p>
+    </div>
+    <ImportExportManager client:load />
+  </div>
+</AdminLayout>
