@@ -27,6 +27,7 @@ interface ClientData {
 
 interface Props {
   initialData?: ClientData
+  studioId: string
 }
 
 const ACTIVITIES = [
@@ -53,7 +54,7 @@ const PROVINCES = [
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
-export function ClientForm({ initialData }: Props) {
+export function ClientForm({ initialData, studioId }: Props) {
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState<ClientData>({
     name: initialData?.name || '',
@@ -112,6 +113,7 @@ export function ClientForm({ initialData }: Props) {
         const { data: newClient, error: clientError } = await supabase
           .from('clients')
           .insert({
+            studio_id: studioId,
             name: formData.name,
             cuit: formData.cuit?.trim() || null,
             apps: ['recablix'],

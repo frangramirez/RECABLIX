@@ -1,11 +1,16 @@
 ---
 import StudioLayout from '@/layouts/StudioLayout.astro'
 import { ClientForm } from '@/components/studio/ClientForm'
+
+const studioId = Astro.locals.studio?.id
+if (!studioId) {
+  return Astro.redirect('/login')
+}
 ---
 
 <StudioLayout title="Nuevo Cliente">
   <div class="space-y-6">
     <h1 class="text-2xl font-bold text-gray-900">Nuevo Cliente</h1>
-    <ClientForm client:load />
+    <ClientForm client:load studioId={studioId} />
   </div>
 </StudioLayout>
