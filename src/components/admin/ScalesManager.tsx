@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,9 +18,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Save } from 'lucide-react'
+import { Save, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import * as XLSX from 'xlsx'
 
 interface Period {
   id: string
@@ -52,6 +53,7 @@ export function ScalesManager({ periods }: Props) {
   const [originalScales, setOriginalScales] = useState<RecaScale[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (periods.length > 0 && !selectedPeriodId) {
@@ -193,6 +195,110 @@ export function ScalesManager({ periods }: Props) {
     }
   }
 
+  function handleExportXLSX() {
+    const selectedPeriod = periods.find(p => p.id === selectedPeriodId)
+    const periodCode = selectedPeriod?.code || 'escalas'
+
+    const exportData = scales.map(s => ({
+      'Categoría': s.category,
+      'Ingreso Anual Máx': s.max_annual_income || '',
+      'Superficie Máx (m²)': s.max_local_m2 || '',
+      'Alquileres Anuales Máx': s.max_annual_rent || '',
+      'Energía Máx (mW)': s.max_annual_mw || '',
+      'Venta Unitaria Máx': s.max_unit_sale || '',
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(exportData)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, `Escalas_${periodCode}`)
+
+    // Ajustar anchos de columna
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 18 }
+    ]
+
+    XLSX.writeFile(wb, `escalas_${periodCode}.xlsx`)
+    toast.success('Archivo exportado correctamente')
+  }
+
+  function handleImportXLSX(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer)
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+        // Validar y mapear datos
+        const importedScales: RecaScale[] = []
+        const errors: string[] = []
+
+        jsonData.forEach((row: any, index: number) => {
+          const category = String(row['Categoría'] || row['Categoria'] || '').toUpperCase().trim()
+
+          if (!CATEGORIES.includes(category)) {
+            errors.push(`Fila ${index + 2}: Categoría "${category}" inválida (debe ser A-K)`)
+            return
+          }
+
+          const maxIncome = parseFloat(row['Ingreso Anual Máx'] || row['Ingreso Anual Max'] || '')
+          const maxM2 = parseFloat(row['Superficie Máx (m²)'] || row['Superficie Max (m2)'] || '')
+          const maxRent = parseFloat(row['Alquileres Anuales Máx'] || row['Alquileres Anuales Max'] || '')
+          const maxMW = parseFloat(row['Energía Máx (mW)'] || row['Energia Max (mW)'] || '')
+          const maxUnitSale = parseFloat(row['Venta Unitaria Máx'] || row['Venta Unitaria Max'] || '')
+
+          importedScales.push({
+            reca_id: selectedPeriodId,
+            category,
+            max_annual_income: isNaN(maxIncome) ? null : maxIncome,
+            max_local_m2: isNaN(maxM2) ? null : maxM2,
+            max_annual_rent: isNaN(maxRent) ? null : maxRent,
+            max_annual_mw: isNaN(maxMW) ? null : maxMW,
+            max_unit_sale: isNaN(maxUnitSale) ? null : maxUnitSale,
+          })
+        })
+
+        if (errors.length > 0) {
+          toast.error(`Errores en importación:\n${errors.slice(0, 3).join('\n')}${errors.length > 3 ? `\n...y ${errors.length - 3} más` : ''}`)
+          return
+        }
+
+        if (importedScales.length === 0) {
+          toast.error('No se encontraron datos válidos en el archivo')
+          return
+        }
+
+        // Actualizar escalas manteniendo las que no están en el import
+        setScales(prev => {
+          const updated = [...prev]
+          importedScales.forEach(imported => {
+            const idx = updated.findIndex(s => s.category === imported.category)
+            if (idx >= 0) {
+              updated[idx] = { ...updated[idx], ...imported }
+            }
+          })
+          return updated
+        })
+
+        toast.success(`${importedScales.length} escalas importadas. Recuerda guardar los cambios.`)
+      } catch (error: any) {
+        console.error('Error importing XLSX:', error)
+        toast.error('Error al leer el archivo Excel')
+      }
+    }
+    reader.readAsArrayBuffer(file)
+
+    // Reset input para permitir reimportar mismo archivo
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
   const hasUnsavedChanges = scales.some((s) => isScaleModified(s.category))
 
   if (periods.length === 0) {
@@ -251,6 +357,23 @@ export function ScalesManager({ periods }: Props) {
           <Button onClick={handleSave} disabled={isSaving || !hasUnsavedChanges}>
             <Save className="h-4 w-4 mr-2" />
             Guardar Cambios
+          </Button>
+
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="h-4 w-4 mr-2" />
+            Importar
+          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImportXLSX}
+            className="hidden"
+          />
+
+          <Button variant="outline" onClick={handleExportXLSX} disabled={scales.length === 0}>
+            <Download className="h-4 w-4 mr-2" />
+            Exportar
           </Button>
         </div>
       </div>
