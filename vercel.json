@@ -1,9 +1,3 @@
 {
-  "buildCommand": "pnpm build",
-  "outputDirectory": "dist",
-  "framework": "astro",
-  "regions": ["iad1"],
-  "env": {
-    "NODE_VERSION": "20"
-  }
+  "regions": ["iad1"]
 }
