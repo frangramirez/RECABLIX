@@ -213,24 +213,27 @@ export function FeesManager({ periods }: Props) {
 
     setIsSaving(true)
     try {
-      const { error } = await supabase.from('reca_fee_components').upsert(
-        components.map((c) => ({
-          id: c.id,
-          reca_id: selectedPeriodId,
-          component_code: c.component_code,
-          description: c.description,
-          component_type: activeTab,
-          category: c.category,
-          value: c.value,
-          province_code: c.province_code,
-          has_municipal: c.has_municipal,
-        })),
-        {
-          onConflict: 'reca_id,component_code,category',
-        }
-      )
+      const response = await fetch('/api/admin/fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          components: components.map((c) => ({
+            id: c.id,
+            reca_id: selectedPeriodId,
+            component_code: c.component_code,
+            description: c.description,
+            component_type: activeTab,
+            category: c.category,
+            value: c.value,
+            province_code: c.province_code,
+            has_municipal: c.has_municipal,
+          })),
+        }),
+      })
 
-      if (error) throw error
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Error al guardar')
+
       toast.success(`Componentes ${activeTab} guardados correctamente`)
       fetchComponents() // Reload
     } catch (error: any) {

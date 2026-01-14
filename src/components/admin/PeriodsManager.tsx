@@ -124,11 +124,12 @@ export function PeriodsManager() {
     }
 
     try {
-      if (editingPeriod) {
-        // Update
-        const { error } = await supabase
-          .from('reca_periods')
-          .update({
+      const response = await fetch('/api/admin/periods', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          period: {
+            id: editingPeriod?.id,
             code: formData.code,
             year: formData.year,
             semester: formData.semester,
@@ -136,28 +137,14 @@ export function PeriodsManager() {
             sales_period_end: formData.sales_period_end || null,
             fee_period_start: formData.fee_period_start || null,
             fee_period_end: formData.fee_period_end || null,
-          })
-          .eq('id', editingPeriod.id)
+          },
+        }),
+      })
 
-        if (error) throw error
-        toast.success('Período actualizado correctamente')
-      } else {
-        // Insert
-        const { error } = await supabase.from('reca_periods').insert({
-          code: formData.code,
-          year: formData.year,
-          semester: formData.semester,
-          sales_period_start: formData.sales_period_start || null,
-          sales_period_end: formData.sales_period_end || null,
-          fee_period_start: formData.fee_period_start || null,
-          fee_period_end: formData.fee_period_end || null,
-          is_active: false,
-        })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Error al guardar')
 
-        if (error) throw error
-        toast.success('Período creado correctamente')
-      }
-
+      toast.success(editingPeriod ? 'Período actualizado correctamente' : 'Período creado correctamente')
       setIsDialogOpen(false)
       fetchPeriods()
     } catch (error: any) {
@@ -168,21 +155,18 @@ export function PeriodsManager() {
 
   async function toggleActive(period: RecaPeriod) {
     try {
-      // Si se está activando, desactivar todos los demás primero
-      if (!period.is_active) {
-        await supabase
-          .from('reca_periods')
-          .update({ is_active: false })
-          .neq('id', period.id)
-      }
+      const response = await fetch('/api/admin/periods', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: period.id,
+          is_active: !period.is_active,
+        }),
+      })
 
-      // Actualizar el período seleccionado
-      const { error } = await supabase
-        .from('reca_periods')
-        .update({ is_active: !period.is_active })
-        .eq('id', period.id)
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Error al cambiar estado')
 
-      if (error) throw error
       toast.success(
         period.is_active
           ? 'Período desactivado'
@@ -205,12 +189,15 @@ export function PeriodsManager() {
     }
 
     try {
-      const { error } = await supabase
-        .from('reca_periods')
-        .delete()
-        .eq('id', period.id)
+      const response = await fetch('/api/admin/periods', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: period.id }),
+      })
 
-      if (error) throw error
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Error al eliminar')
+
       toast.success('Período eliminado correctamente')
       fetchPeriods()
     } catch (error: any) {
