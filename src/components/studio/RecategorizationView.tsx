@@ -19,7 +19,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { toast } from 'sonner'
-import { Search, Download, FileText, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react'
+import { Search, Download, FileText, TrendingUp, TrendingDown, Minus, RefreshCw, FileDown } from 'lucide-react'
 import * as XLSX from 'xlsx'
 
 interface Props {
@@ -44,6 +44,8 @@ export function RecategorizationView({
   const [search, setSearch] = useState('')
   const [changeFilter, setChangeFilter] = useState<ChangeFilter>('all')
   const [selectedResult, setSelectedResult] = useState<RecategorizationResult | null>(null)
+  const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set())
+  const [generatingPdfs, setGeneratingPdfs] = useState(false)
 
   // Cache de escalas y componentes para recálculo
   const [cachedScales, setCachedScales] = useState<Scale[] | null>(null)
@@ -207,6 +209,62 @@ export function RecategorizationView({
     toast.success('Archivo exportado', { description: `recategorizacion-${recaCode}.xlsx` })
   }
 
+  const handleBatchPdf = async () => {
+    setGeneratingPdfs(true)
+    try {
+      const clientIds = selectedClients.size > 0
+        ? Array.from(selectedClients)
+        : results.map(r => r.client.id)
+
+      const response = await fetch('/api/pdf/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientIds }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Error al generar PDFs')
+      }
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `RECA-${recaCode}.zip`
+      a.click()
+      URL.revokeObjectURL(url)
+
+      toast.success('PDFs generados', {
+        description: `${clientIds.length} archivos descargados en RECA-${recaCode}.zip`
+      })
+    } catch (err) {
+      console.error('Error generating PDFs:', err)
+      toast.error('Error al generar PDFs')
+    } finally {
+      setGeneratingPdfs(false)
+    }
+  }
+
+  const toggleClientSelection = (clientId: string) => {
+    setSelectedClients(prev => {
+      const next = new Set(prev)
+      if (next.has(clientId)) {
+        next.delete(clientId)
+      } else {
+        next.add(clientId)
+      }
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedClients.size === filteredResults.length) {
+      setSelectedClients(new Set())
+    } else {
+      setSelectedClients(new Set(filteredResults.map(r => r.client.id)))
+    }
+  }
+
   const getChangeIcon = (change: string) => {
     switch (change) {
       case 'UP':
@@ -298,7 +356,19 @@ export function RecategorizationView({
         <div className="flex-1" />
         <Button variant="outline" onClick={handleExport} disabled={results.length === 0}>
           <Download className="h-4 w-4 mr-2" />
-          Exportar
+          Exportar Excel
+        </Button>
+        <Button
+          variant="outline"
+          onClick={handleBatchPdf}
+          disabled={results.length === 0 || generatingPdfs}
+        >
+          {generatingPdfs ? (
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <FileDown className="h-4 w-4 mr-2" />
+          )}
+          PDFs ({selectedClients.size || results.length})
         </Button>
         <Button variant="outline" onClick={calculateAll}>
           <RefreshCw className="h-4 w-4 mr-2" />
@@ -320,14 +390,22 @@ export function RecategorizationView({
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <input
+                    type="checkbox"
+                    checked={selectedClients.size === filteredResults.length && filteredResults.length > 0}
+                    onChange={toggleSelectAll}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                </TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead className="text-center">Cat Ant</TableHead>
                 <TableHead className="text-center w-12"></TableHead>
                 <TableHead className="text-center">Cat Nueva</TableHead>
                 <TableHead className="text-right">Cuota Ant</TableHead>
                 <TableHead className="text-right">Cuota Nueva</TableHead>
-                <TableHead className="text-right">Variación</TableHead>
-                <TableHead className="w-12"></TableHead>
+                <TableHead className="text-right">Variacion</TableHead>
+                <TableHead className="w-24"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -337,6 +415,14 @@ export function RecategorizationView({
                   className="cursor-pointer hover:bg-gray-50"
                   onClick={() => setSelectedResult(result)}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <input
+                      type="checkbox"
+                      checked={selectedClients.has(result.client.id)}
+                      onChange={() => toggleClientSelection(result.client.id)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{result.client.name}</TableCell>
                   <TableCell className="text-center">
                     {result.comparison.previousCategory ? (
@@ -371,16 +457,30 @@ export function RecategorizationView({
                       : <span className="text-gray-400">-</span>}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedResult(result)
-                      }}
-                    >
-                      <FileText className="h-4 w-4" />
-                    </Button>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setSelectedResult(result)
+                        }}
+                        title="Ver detalle"
+                      >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.open(`/studio/recategorization/${result.client.id}/pdf`, '_blank')
+                        }}
+                        title="Ver PDF"
+                      >
+                        <FileDown className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

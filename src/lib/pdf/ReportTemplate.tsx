@@ -80,9 +80,6 @@ export function ReportTemplate({
   periodSales
 }: Props) {
   const currentCategory = result.category.finalCategory
-  const currentScale = scales.find(s => s.category === currentCategory)
-  const disponible = currentScale ? currentScale.max_annual_income - periodSales : 0
-  const promedioMensual = disponible > 0 ? disponible / 6 : 0
 
   return (
     <Document>
@@ -184,7 +181,7 @@ export function ReportTemplate({
               const catPromedio = catDisponible > 0 ? catDisponible / 6 : 0
 
               return (
-                <View key={scale.category} style={[styles.tableRow, isCurrentCat && styles.tableRowHighlight]}>
+                <View key={scale.category} style={[styles.tableRow, isCurrentCat ? styles.tableRowHighlight : {}]}>
                   <Text style={[styles.tableCell, { flex: 0.5, fontWeight: isCurrentCat ? 'bold' : 'normal' }]}>
                     {scale.category}
                   </Text>
