@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro'
-import { createSupabaseServerClient, isSuperAdminEmail } from '@/lib/auth'
+import { createSupabaseServerClient } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -61,11 +61,27 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Determinar redirect según rol
     const redirectTo = superadmin ? '/admin' : '/studio'
 
-    // Las cookies de Supabase se setean automáticamente via setAll()
-    return new Response(JSON.stringify({ success: true, redirectTo }), {
+    // Setear cookies de sesión manualmente (Astro no las incluye en Response manual)
+    const session = data.session
+    const cookieOptions = {
+      path: '/',
+      secure: import.meta.env.PROD,
+      sameSite: 'lax' as const,
+      httpOnly: true,
+      maxAge: 60 * 60 * 24 * 7, // 7 días
+    }
+
+    // Cookie con el token de acceso
+    cookies.set('sb-access-token', session.access_token, cookieOptions)
+    cookies.set('sb-refresh-token', session.refresh_token, cookieOptions)
+
+    // Crear response con headers de cookies
+    const response = new Response(JSON.stringify({ success: true, redirectTo }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
+
+    return response
   } catch (err) {
     console.error('Login error:', err)
     return new Response(

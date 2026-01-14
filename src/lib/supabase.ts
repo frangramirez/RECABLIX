@@ -35,10 +35,13 @@ export function createSupabaseServerClient(cookies: AstroCookies, request?: Requ
         }
 
         // Fallback: Astro no expone getAll, leer cookies conocidas
+        const projectRef = supabaseUrl.split('//')[1]?.split('.')[0] || ''
         const cookieNames = [
           'sb-access-token',
           'sb-refresh-token',
-          `sb-${supabaseUrl.split('//')[1]?.split('.')[0]}-auth-token`,
+          `sb-${projectRef}-auth-token`,
+          `sb-${projectRef}-auth-token.0`,
+          `sb-${projectRef}-auth-token.1`,
         ]
         const result: { name: string; value: string }[] = []
         for (const name of cookieNames) {
