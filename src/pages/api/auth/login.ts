@@ -61,27 +61,21 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Determinar redirect según rol
     const redirectTo = superadmin ? '/admin' : '/studio'
 
-    // Setear cookies de sesión manualmente (Astro no las incluye en Response manual)
+    // Setear cookies de sesión manualmente en los headers de la Response
     const session = data.session
-    const cookieOptions = {
-      path: '/',
-      secure: import.meta.env.PROD,
-      sameSite: 'lax' as const,
-      httpOnly: true,
-      maxAge: 60 * 60 * 24 * 7, // 7 días
-    }
+    const isProduction = import.meta.env.PROD
+    const cookieFlags = `Path=/; ${isProduction ? 'Secure; ' : ''}SameSite=Lax; HttpOnly; Max-Age=${60 * 60 * 24 * 7}`
 
-    // Cookie con el token de acceso
-    cookies.set('sb-access-token', session.access_token, cookieOptions)
-    cookies.set('sb-refresh-token', session.refresh_token, cookieOptions)
+    // Headers permite múltiples Set-Cookie via append()
+    const headers = new Headers()
+    headers.set('Content-Type', 'application/json')
+    headers.append('Set-Cookie', `sb-access-token=${session.access_token}; ${cookieFlags}`)
+    headers.append('Set-Cookie', `sb-refresh-token=${session.refresh_token}; ${cookieFlags}`)
 
-    // Crear response con headers de cookies
-    const response = new Response(JSON.stringify({ success: true, redirectTo }), {
+    return new Response(JSON.stringify({ success: true, redirectTo }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers,
     })
-
-    return response
   } catch (err) {
     console.error('Login error:', err)
     return new Response(
