@@ -1,0 +1,16 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { ClientsGlobalManager } from '@/components/admin/ClientsGlobalManager'
+---
+
+<AdminLayout title="Clientes Global">
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold text-foreground">Clientes Global</h1>
+      <p class="text-muted-foreground mt-1">
+        Vista de todos los clientes de todos los estudios con datos de recategorización.
+      </p>
+    </div>
+    <ClientsGlobalManager client:load />
+  </div>
+</AdminLayout>
