@@ -2,7 +2,7 @@ import { defineMiddleware } from 'astro:middleware'
 import { getStudioFromSession } from '@/lib/auth'
 
 // Rutas públicas (no requieren auth)
-const PUBLIC_ROUTES = ['/', '/login', '/api/auth/login', '/api/auth/logout', '/api/auth/debug']
+const PUBLIC_ROUTES = ['/', '/login', '/api/auth/login', '/api/auth/logout']
 
 // Prefijo de rutas solo para SuperAdmin
 const ADMIN_ROUTES_PREFIX = '/admin'
