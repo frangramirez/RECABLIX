@@ -134,24 +134,27 @@ export function ScalesManager({ periods }: Props) {
 
     setIsSaving(true)
     try {
-      // Upsert de todas las escalas
-      const { error } = await supabase.from('reca_scales').upsert(
-        scales.map((s) => ({
-          id: s.id,
-          reca_id: selectedPeriodId,
-          category: s.category,
-          max_annual_income: s.max_annual_income,
-          max_local_m2: s.max_local_m2,
-          max_annual_mw: s.max_annual_mw,
-          max_annual_rent: s.max_annual_rent,
-          max_unit_sale: s.max_unit_sale,
-        })),
-        {
-          onConflict: 'reca_id,category',
-        }
-      )
+      // Usar endpoint API que bypassa RLS con supabaseAdmin
+      const response = await fetch('/api/admin/scales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scales: scales.map((s) => ({
+            id: s.id,
+            reca_id: selectedPeriodId,
+            category: s.category,
+            max_annual_income: s.max_annual_income,
+            max_local_m2: s.max_local_m2,
+            max_annual_mw: s.max_annual_mw,
+            max_annual_rent: s.max_annual_rent,
+            max_unit_sale: s.max_unit_sale,
+          })),
+        }),
+      })
 
-      if (error) throw error
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || 'Error al guardar')
+
       toast.success('Escalas guardadas correctamente')
       fetchScales() // Reload para actualizar IDs y originalScales
     } catch (error: any) {
