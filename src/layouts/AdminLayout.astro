@@ -1,0 +1,59 @@
+---
+import { AdminSidebar } from '@/components/admin/AdminSidebar'
+import { AdminHeader } from '@/components/admin/AdminHeader'
+import { SessionInit } from '@/components/providers/SessionProvider'
+import { Toaster } from '@/components/ui/sonner'
+
+interface Props {
+  title?: string
+}
+
+const { title = 'Admin' } = Astro.props
+
+// Obtener studio desde middleware (ya verificado como superadmin)
+const studio = Astro.locals.studio
+const studioData = studio
+  ? {
+      id: studio.id,
+      name: studio.name,
+      email: studio.email,
+      is_superadmin: studio.is_superadmin,
+    }
+  : null
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <title>{title} | RECABLIX Admin</title>
+  <!-- Geist Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-muted/30">
+  <!-- Inicializar sesión en el store -->
+  <SessionInit client:load studio={studioData} />
+
+  <div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <AdminSidebar client:load />
+
+    <!-- Main content -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <AdminHeader client:load />
+      <main class="flex-1 overflow-y-auto p-6">
+        <slot />
+      </main>
+    </div>
+  </div>
+  <Toaster client:load position="top-right" />
+</body>
+</html>
+
+<style is:global>
+  @import "../styles/globals.css";
+</style>
