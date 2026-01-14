@@ -1,0 +1,37 @@
+---
+import StudioLayout from '@/layouts/StudioLayout.astro'
+import { TransactionsManager } from '@/components/studio/TransactionsManager'
+import { createSupabaseServerClient } from '@/lib/auth'
+
+const { id } = Astro.params
+const supabase = createSupabaseServerClient(Astro.cookies)
+
+const { data: client } = await supabase
+  .from('clients')
+  .select('id, name')
+  .eq('id', id)
+  .single()
+
+const { data: activePeriod } = await supabase
+  .from('reca_periods')
+  .select('*')
+  .eq('is_active', true)
+  .single()
+
+if (!client) return Astro.redirect('/studio/clients')
+---
+
+<StudioLayout title={`Transacciones - ${client.name}`}>
+  <div class="space-y-6">
+    <div class="flex items-center gap-4">
+      <a href="/studio/clients" class="text-gray-500 hover:text-gray-700">← Volver</a>
+      <h1 class="text-2xl font-bold text-gray-900">Transacciones: {client.name}</h1>
+    </div>
+    <TransactionsManager
+      client:load
+      clientId={client.id}
+      clientName={client.name}
+      activePeriod={activePeriod}
+    />
+  </div>
+</StudioLayout>
