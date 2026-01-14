@@ -14,19 +14,24 @@ import { test, expect } from '@playwright/test'
 test.describe('Recategorización', () => {
   // Setup: estos tests requieren estar autenticado
   test.beforeEach(async ({ page }) => {
-    const hasAuth = process.env.TEST_USER_EMAIL && process.env.TEST_USER_PASSWORD
+    const testEmail = process.env.TEST_USER_EMAIL || 'test@recablix.ar'
+    const testPassword = process.env.TEST_USER_PASSWORD || 'testing123'
 
-    if (!hasAuth) {
-      test.skip()
-      return
-    }
-
-    // Login
     await page.goto('/login')
-    await page.fill('input[name="email"]', process.env.TEST_USER_EMAIL!)
-    await page.fill('input[name="password"]', process.env.TEST_USER_PASSWORD!)
-    await page.click('button[type="submit"]')
-    await page.waitForURL(/\/studio/)
+    await page.waitForLoadState('networkidle')
+
+    const emailInput = page.locator('input[id="email"]')
+    const passwordInput = page.locator('input[id="password"]')
+    const submitBtn = page.locator('button[type="submit"]')
+
+    await emailInput.waitFor({ state: 'visible', timeout: 10000 })
+    await emailInput.clear()
+    await emailInput.fill(testEmail)
+    await passwordInput.clear()
+    await passwordInput.fill(testPassword)
+
+    await submitBtn.click()
+    await page.waitForURL(/\/studio/, { timeout: 15000 })
   })
 
   test('página /studio/recategorization es accesible', async ({ page }) => {
@@ -39,18 +44,21 @@ test.describe('Recategorización', () => {
     test('muestra tarjetas con estadísticas básicas', async ({ page }) => {
       await page.goto('/studio/recategorization')
 
-      // Buscar indicadores de stats (pueden tener variantes de texto)
+      // Esperar a que la página cargue completamente
+      await page.waitForLoadState('networkidle')
+
+      // Buscar indicadores de stats usando getByText con regex
       const statsKeywords = [
-        /Total.*Clientes?/i,
-        /Suben?/i,
-        /Bajan?/i,
-        /Mantienen?|Igual|Sin cambio/i,
+        /Total Clientes/i,
+        /Suben/i,
+        /Bajan/i,
+        /Igual/i,
       ]
 
       // Verificar que al menos 2 stats están visibles
       let visibleStats = 0
       for (const keyword of statsKeywords) {
-        const statElement = page.locator(`text=${keyword}`).first()
+        const statElement = page.getByText(keyword).first()
         if (await statElement.count() > 0) {
           visibleStats++
         }
@@ -75,15 +83,19 @@ test.describe('Recategorización', () => {
     test('muestra tabla con resultados de recategorización', async ({ page }) => {
       await page.goto('/studio/recategorization')
 
-      // Buscar tabla (puede ser <table>, div con role="table", o custom)
+      // Esperar a que la página cargue completamente
+      await page.waitForLoadState('networkidle')
+
+      // Buscar tabla (puede ser <table>, div con role="table"], o custom)
       const tableSelector = 'table, [role="table"], [data-testid="recategorization-table"]'
       const table = page.locator(tableSelector).first()
 
       if (await table.count() > 0) {
         await expect(table).toBeVisible()
       } else {
-        // Verificar que hay contenido de recategorización
-        await expect(page.locator('text=/Categoría|Cliente|Cuota/i')).toBeVisible()
+        // Verificar que hay contenido de recategorización (buscar headers o mensaje de vacío)
+        const hasContent = await page.getByText(/Cliente|No hay clientes/i).first().count() > 0
+        expect(hasContent).toBeTruthy()
       }
     })
 

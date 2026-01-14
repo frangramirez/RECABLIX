@@ -43,10 +43,16 @@ test('debug login flow', async ({ page }) => {
 
   await page.goto('/login')
 
-  await page.fill('input[id="email"]', 'test@recablix.ar')
-  await page.fill('input[id="password"]', 'testing123')
+  // Esperar a que los inputs estén listos
+  const emailInput = page.locator('input[id="email"]')
+  const passwordInput = page.locator('input[id="password"]')
+  const submitBtn = page.locator('button[type="submit"]')
 
-  await page.click('button[type="submit"]')
+  await emailInput.waitFor({ state: 'visible' })
+  await emailInput.fill('test@recablix.ar')
+  await passwordInput.fill('testing123')
+
+  await submitBtn.click()
 
   // Esperar un poco para ver qué pasa
   await page.waitForTimeout(5000)

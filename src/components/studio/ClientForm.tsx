@@ -287,10 +287,10 @@ export function ClientForm({ initialData, studioId }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label>Categoría Anterior</Label>
-              <Select value={formData.previous_category || ''} onValueChange={(v) => updateField('previous_category', v || null)}>
+              <Select value={formData.previous_category || '__none__'} onValueChange={(v) => updateField('previous_category', v === '__none__' ? null : v)}>
                 <SelectTrigger><SelectValue placeholder="Sin datos" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin datos</SelectItem>
+                  <SelectItem value="__none__">Sin datos</SelectItem>
                   {CATEGORIES.map(c => <SelectItem key={c} value={c}>Categoría {c}</SelectItem>)}
                 </SelectContent>
               </Select>

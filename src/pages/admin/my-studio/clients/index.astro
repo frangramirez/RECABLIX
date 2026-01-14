@@ -1,0 +1,35 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { ClientsTable } from '@/components/studio/ClientsTable'
+
+const studio = Astro.locals.studio
+if (!studio?.id) {
+  return Astro.redirect('/admin/my-studio/setup')
+}
+---
+
+<AdminLayout title="Mis Clientes">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">Mis Clientes</h1>
+        <p class="text-muted-foreground text-sm">Gestiona los clientes de tu estudio</p>
+      </div>
+      <div class="flex gap-2">
+        <a
+          href="/admin/my-studio/clients/import"
+          class="inline-flex items-center px-4 py-2 border rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+        >
+          Importar Excel
+        </a>
+        <a
+          href="/admin/my-studio/clients/new"
+          class="inline-flex items-center px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Nuevo Cliente
+        </a>
+      </div>
+    </div>
+    <ClientsTable client:load />
+  </div>
+</AdminLayout>

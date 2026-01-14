@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, Page } from '@playwright/test'
 
 /**
  * Tests E2E - Autenticación
@@ -9,6 +9,35 @@ import { test, expect } from '@playwright/test'
  * - Logout
  * - Protección de rutas admin
  */
+
+// Helper para hacer login
+async function doLogin(page: Page, email: string, password: string) {
+  await page.goto('/login')
+
+  // Esperar a que la página esté completamente cargada
+  await page.waitForLoadState('networkidle')
+
+  const emailInput = page.locator('input[id="email"]')
+  const passwordInput = page.locator('input[id="password"]')
+  const submitBtn = page.locator('button[type="submit"]')
+
+  // Esperar a que los inputs estén visibles y habilitados
+  await emailInput.waitFor({ state: 'visible', timeout: 10000 })
+  await expect(emailInput).toBeEnabled()
+
+  // Limpiar y llenar campos
+  await emailInput.clear()
+  await emailInput.fill(email)
+
+  await passwordInput.clear()
+  await passwordInput.fill(password)
+
+  // Verificar que se llenaron correctamente antes de hacer submit
+  await expect(emailInput).toHaveValue(email)
+  await expect(passwordInput).toHaveValue(password)
+
+  await submitBtn.click()
+}
 
 test.describe('Autenticación', () => {
   test('redirige a /login si no autenticado al acceder /studio', async ({ page }) => {
@@ -39,56 +68,51 @@ test.describe('Autenticación', () => {
     // Para CI/CD, usar variables de entorno TEST_USER_EMAIL y TEST_USER_PASSWORD
 
     test('login exitoso redirige a /studio', async ({ page }) => {
-      const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com'
-      const testPassword = process.env.TEST_USER_PASSWORD || 'password123'
+      // Credenciales por defecto si env vars no están disponibles
+      const testEmail = process.env.TEST_USER_EMAIL || 'test@recablix.ar'
+      const testPassword = process.env.TEST_USER_PASSWORD || 'testing123'
 
-      await page.goto('/login')
+      await doLogin(page, testEmail, testPassword)
+      await page.waitForURL(/\/studio/, { timeout: 15000 })
 
-      // Completar formulario
-      await page.fill('input[id="email"]', testEmail)
-      await page.fill('input[id="password"]', testPassword)
-
-      // Click submit y esperar navegación
-      await Promise.all([
-        page.waitForURL(/\/studio/, { timeout: 10000 }),
-        page.click('button[type="submit"]')
-      ])
-
-      // Verificar que muestra contenido autenticado
-      await expect(page.locator('text=/Clientes|Dashboard|Recategorización/i')).toBeVisible({ timeout: 10000 })
+      // Verificar que muestra contenido autenticado (usar heading más específico)
+      await expect(page.locator('h1:has-text("Dashboard")')).toBeVisible({ timeout: 10000 })
     })
 
     test('logout redirige a /login', async ({ page }) => {
-      // Primero hacer login (requiere usuario de prueba)
-      const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com'
-      const testPassword = process.env.TEST_USER_PASSWORD || 'password123'
+      const testEmail = process.env.TEST_USER_EMAIL || 'test@recablix.ar'
+      const testPassword = process.env.TEST_USER_PASSWORD || 'testing123'
 
-      await page.goto('/login')
-      await page.fill('input[id="email"]', testEmail)
-      await page.fill('input[id="password"]', testPassword)
-      await page.click('button[type="submit"]')
+      await doLogin(page, testEmail, testPassword)
+      await page.waitForURL(/\/studio/, { timeout: 15000 })
 
-      // Esperar a estar autenticado
-      await page.waitForURL(/\/studio/)
+      // Esperar a que la página esté estable
+      await page.waitForLoadState('networkidle')
 
-      // Hacer logout (buscar botón de logout)
-      await page.click('text=/Cerrar sesión|Logout|Salir/i')
+      // Abrir menú de usuario - buscar el botón trigger del dropdown en el header
+      const userMenuBtn = page.locator('[data-slot="dropdown-menu-trigger"]').first()
+      await userMenuBtn.waitFor({ state: 'visible', timeout: 5000 })
+      await userMenuBtn.click()
+
+      // Esperar a que el dropdown content aparezca (Radix usa portales)
+      const dropdownContent = page.locator('[data-slot="dropdown-menu-content"]')
+      await dropdownContent.waitFor({ state: 'visible', timeout: 5000 })
+
+      // Buscar la opción "Cerrar Sesión" dentro del dropdown
+      const logoutOption = dropdownContent.locator('[data-slot="dropdown-menu-item"]:has-text("Cerrar Sesión")')
+      await logoutOption.waitFor({ state: 'visible', timeout: 3000 })
+      await logoutOption.click()
 
       // Debe redirigir a login
-      await expect(page).toHaveURL(/\/login/)
+      await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
     })
 
     test('usuario normal no puede acceder a /admin', async ({ page }) => {
-      // Login como usuario normal (no superadmin)
-      const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com'
-      const testPassword = process.env.TEST_USER_PASSWORD || 'password123'
+      const testEmail = process.env.TEST_USER_EMAIL || 'test@recablix.ar'
+      const testPassword = process.env.TEST_USER_PASSWORD || 'testing123'
 
-      await page.goto('/login')
-      await page.fill('input[id="email"]', testEmail)
-      await page.fill('input[id="password"]', testPassword)
-      await page.click('button[type="submit"]')
-
-      await page.waitForURL(/\/studio/)
+      await doLogin(page, testEmail, testPassword)
+      await page.waitForURL(/\/studio/, { timeout: 15000 })
 
       // Intentar acceder a admin
       await page.goto('/admin')

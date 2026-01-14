@@ -1,0 +1,12 @@
+---
+// Redirect to clients or setup
+const studio = Astro.locals.studio
+
+// If no studio membership, go to setup
+if (!studio?.id) {
+  return Astro.redirect('/admin/my-studio/setup')
+}
+
+// Otherwise go to clients
+return Astro.redirect('/admin/my-studio/clients')
+---

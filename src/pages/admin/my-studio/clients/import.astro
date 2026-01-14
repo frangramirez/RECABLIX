@@ -1,0 +1,21 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { ClientImporter } from '@/components/studio/ClientImporter'
+
+const studioId = Astro.locals.studio?.id
+if (!studioId) {
+  return Astro.redirect('/admin/my-studio/setup')
+}
+---
+
+<AdminLayout title="Importar Clientes">
+  <div class="space-y-6">
+    <div class="flex items-center gap-4">
+      <a href="/admin/my-studio/clients" class="text-muted-foreground hover:text-foreground">
+        &larr; Volver a clientes
+      </a>
+    </div>
+    <h1 class="text-2xl font-bold">Importar Clientes</h1>
+    <ClientImporter client:load />
+  </div>
+</AdminLayout>

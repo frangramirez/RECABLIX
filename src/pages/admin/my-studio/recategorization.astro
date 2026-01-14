@@ -1,0 +1,41 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { RecategorizationView } from '@/components/studio/RecategorizationView'
+import { createSupabaseServerClient } from '@/lib/auth'
+
+const studio = Astro.locals.studio
+if (!studio?.id) return Astro.redirect('/admin/my-studio/setup')
+
+const supabase = createSupabaseServerClient(Astro.cookies)
+
+// Obtener período activo
+const { data: activePeriod } = await supabase
+  .from('reca_periods')
+  .select('*')
+  .eq('is_active', true)
+  .single()
+
+if (!activePeriod) {
+  return Astro.redirect('/admin/my-studio?error=no_active_period')
+}
+---
+
+<AdminLayout title="Recategorización">
+  <div class="space-y-6">
+    <div>
+      <h1 class="text-2xl font-bold">Recategorización</h1>
+      <p class="text-muted-foreground">
+        Período {activePeriod.code} |
+        Ventas: {activePeriod.sales_period_start} - {activePeriod.sales_period_end}
+      </p>
+    </div>
+    <RecategorizationView
+      client:load
+      studioId={studio.id}
+      recaId={activePeriod.id}
+      recaCode={activePeriod.code}
+      salesPeriodStart={activePeriod.sales_period_start}
+      salesPeriodEnd={activePeriod.sales_period_end}
+    />
+  </div>
+</AdminLayout>

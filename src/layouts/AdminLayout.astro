@@ -3,6 +3,7 @@ import { AdminSidebar } from '@/components/admin/AdminSidebar'
 import { AdminHeader } from '@/components/admin/AdminHeader'
 import { SessionInit } from '@/components/providers/SessionProvider'
 import { Toaster } from '@/components/ui/sonner'
+import { supabaseAdmin } from '@/lib/supabase'
 
 interface Props {
   title?: string
@@ -20,6 +21,26 @@ const studioData = studio
       is_superadmin: studio.is_superadmin,
     }
   : null
+
+// Obtener estudio del superadmin (su membresía, no la sesión)
+let superadminStudioId: string | null = null
+let superadminStudioName: string | null = null
+
+if (studio?.is_superadmin && supabaseAdmin) {
+  // El superadmin puede tener un estudio diferente al que viene en la sesión
+  // Buscamos específicamente su membresía
+  const { data: membership } = await supabaseAdmin
+    .from('studio_members')
+    .select('studio_id, studios(id, name)')
+    .eq('user_id', studio.id)
+    .single()
+
+  if (membership?.studios) {
+    const studioInfo = membership.studios as { id: string; name: string }
+    superadminStudioId = studioInfo.id
+    superadminStudioName = studioInfo.name
+  }
+}
 ---
 
 <!DOCTYPE html>
@@ -40,7 +61,7 @@ const studioData = studio
 
   <div class="flex h-screen overflow-hidden">
     <!-- Sidebar -->
-    <AdminSidebar client:load />
+    <AdminSidebar client:load studioId={superadminStudioId} studioName={superadminStudioName} />
 
     <!-- Main content -->
     <div class="flex-1 flex flex-col overflow-hidden">

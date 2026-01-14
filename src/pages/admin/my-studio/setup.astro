@@ -1,0 +1,23 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { MyStudioSetup } from '@/components/admin/MyStudioSetup'
+
+// Si ya tiene estudio, redirigir a clients
+const studio = Astro.locals.studio
+if (studio?.studio_id) {
+  return Astro.redirect('/admin/my-studio/clients')
+}
+---
+
+<AdminLayout title="Configurar Mi Estudio">
+  <div class="max-w-2xl mx-auto">
+    <div class="mb-8">
+      <h1 class="text-2xl font-bold">Configurar Mi Estudio</h1>
+      <p class="text-muted-foreground mt-1">
+        Para usar las funcionalidades de estudio, necesitas crear uno nuevo o asociarte a uno existente.
+      </p>
+    </div>
+
+    <MyStudioSetup client:load />
+  </div>
+</AdminLayout>
