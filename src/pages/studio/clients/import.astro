@@ -1,0 +1,11 @@
+---
+import StudioLayout from '@/layouts/StudioLayout.astro'
+import { ClientImporter } from '@/components/studio/ClientImporter'
+---
+
+<StudioLayout title="Importar Clientes">
+  <div class="space-y-6">
+    <h1 class="text-2xl font-bold text-gray-900">Importar Clientes</h1>
+    <ClientImporter client:load />
+  </div>
+</StudioLayout>
