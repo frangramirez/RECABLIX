@@ -43,13 +43,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       .eq('is_active', true)
       .single()
 
-    // Verificar si ya tiene un studio asignado
-    const { data: membership, error: membershipError } = await supabaseAdmin
+    // Verificar si ya tiene un studio asignado (tomar el primero si tiene varios)
+    const { data: memberships, error: membershipError } = await supabaseAdmin
       .from('studio_members')
       .select('studio_id, role')
       .eq('user_id', data.user.id)
-      .single()
+      .limit(1)
 
+    const membership = memberships?.[0]
     if (membershipError || !membership) {
       return new Response(
         JSON.stringify({ error: 'Usuario sin studio asignado. Contactá al administrador.' }),
