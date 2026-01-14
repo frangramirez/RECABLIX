@@ -21,6 +21,7 @@ export function LoginForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password }),
+        credentials: 'same-origin', // Asegurar que las cookies se envíen y reciban
       })
 
       const data = await res.json()

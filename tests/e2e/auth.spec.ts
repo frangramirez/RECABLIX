@@ -38,7 +38,7 @@ test.describe('Autenticación', () => {
     // Estos tests requieren configuración de usuario de prueba en Supabase
     // Para CI/CD, usar variables de entorno TEST_USER_EMAIL y TEST_USER_PASSWORD
 
-    test.skip('login exitoso redirige a /studio', async ({ page }) => {
+    test('login exitoso redirige a /studio', async ({ page }) => {
       const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com'
       const testPassword = process.env.TEST_USER_PASSWORD || 'password123'
 
@@ -47,16 +47,18 @@ test.describe('Autenticación', () => {
       // Completar formulario
       await page.fill('input[id="email"]', testEmail)
       await page.fill('input[id="password"]', testPassword)
-      await page.click('button[type="submit"]')
 
-      // Debe redirigir a studio después del login
-      await expect(page).toHaveURL(/\/studio/)
+      // Click submit y esperar navegación
+      await Promise.all([
+        page.waitForURL(/\/studio/, { timeout: 10000 }),
+        page.click('button[type="submit"]')
+      ])
 
       // Verificar que muestra contenido autenticado
-      await expect(page.locator('text=/Clientes|Dashboard|Recategorización/i')).toBeVisible()
+      await expect(page.locator('text=/Clientes|Dashboard|Recategorización/i')).toBeVisible({ timeout: 10000 })
     })
 
-    test.skip('logout redirige a /login', async ({ page }) => {
+    test('logout redirige a /login', async ({ page }) => {
       // Primero hacer login (requiere usuario de prueba)
       const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com'
       const testPassword = process.env.TEST_USER_PASSWORD || 'password123'
@@ -76,7 +78,7 @@ test.describe('Autenticación', () => {
       await expect(page).toHaveURL(/\/login/)
     })
 
-    test.skip('usuario normal no puede acceder a /admin', async ({ page }) => {
+    test('usuario normal no puede acceder a /admin', async ({ page }) => {
       // Login como usuario normal (no superadmin)
       const testEmail = process.env.TEST_USER_EMAIL || 'test@example.com'
       const testPassword = process.env.TEST_USER_PASSWORD || 'password123'

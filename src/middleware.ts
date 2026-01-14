@@ -26,7 +26,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   }
 
   // Verificar sesión
-  const studio = await getStudioFromSession(context.cookies)
+  const studio = await getStudioFromSession(context.cookies, context.request)
 
   if (!studio) {
     // Sin sesión - redirect a login

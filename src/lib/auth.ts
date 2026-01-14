@@ -18,21 +18,37 @@ export async function getSession(cookies: AstroCookies) {
  * Obtiene el studio asociado al usuario autenticado
  * Retorna null si no hay sesión o no existe el studio
  */
-export async function getStudioFromSession(cookies: AstroCookies) {
-  const supabase = createSupabaseServerClient(cookies)
+export async function getStudioFromSession(cookies: AstroCookies, request?: Request) {
+  const supabase = createSupabaseServerClient(cookies, request)
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   if (!user) return null
 
-  const { data: studio } = await supabase
-    .from('studios')
+  // Verificar si es superadmin
+  const { data: superadmin } = await supabase
+    .from('superadmins')
     .select('*')
-    .eq('auth_user_id', user.id)
+    .eq('user_id', user.id)
+    .eq('is_active', true)
     .single()
 
-  return studio
+  // Obtener studio desde studio_members
+  const { data: membership } = await supabase
+    .from('studio_members')
+    .select('studio_id, role, studios(*)')
+    .eq('user_id', user.id)
+    .single()
+
+  if (!membership?.studios) return null
+
+  // Agregar flag de superadmin al studio
+  return {
+    ...membership.studios,
+    is_superadmin: !!superadmin,
+    role: membership.role,
+  }
 }
 
 /**

@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test'
+import { config } from 'dotenv'
+
+// Cargar variables de entorno de .env.test si existe
+config({ path: '.env.test' })
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -10,6 +14,9 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4321',
     trace: 'on-first-retry',
+    // Asegurar que las cookies funcionen correctamente
+    storageState: undefined,
+    acceptDownloads: true,
   },
   projects: [
     {

@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro'
 import { createSupabaseServerClient, isSuperAdminEmail } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   try {
@@ -12,7 +13,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       )
     }
 
-    const supabase = createSupabaseServerClient(cookies)
+    const supabase = createSupabaseServerClient(cookies, request)
 
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
@@ -26,41 +27,40 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       })
     }
 
-    // Verificar si existe studio para este usuario
-    const { data: existingStudio } = await supabase
-      .from('studios')
+    // Usar cliente admin para bypasear RLS durante login
+    if (!supabaseAdmin) {
+      return new Response(
+        JSON.stringify({ error: 'Service key no configurada' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Verificar si es superadmin
+    const { data: superadmin } = await supabaseAdmin
+      .from('superadmins')
       .select('*')
-      .eq('auth_user_id', data.user.id)
+      .eq('user_id', data.user.id)
+      .eq('is_active', true)
       .single()
 
-    let studio = existingStudio
+    // Verificar si ya tiene un studio asignado
+    const { data: membership, error: membershipError } = await supabaseAdmin
+      .from('studio_members')
+      .select('studio_id, role')
+      .eq('user_id', data.user.id)
+      .single()
 
-    if (!existingStudio) {
-      // Crear studio para nuevo usuario
-      const isSuperAdmin = isSuperAdminEmail(email)
-
-      const { data: newStudio, error: studioError } = await supabase
-        .from('studios')
-        .insert({
-          auth_user_id: data.user.id,
-          email: data.user.email,
-          name: data.user.email?.split('@')[0] || 'Studio',
-          is_superadmin: isSuperAdmin,
-          is_active: true,
-        })
-        .select()
-        .single()
-
-      if (studioError) {
-        console.error('Error creating studio:', studioError)
-      }
-
-      studio = newStudio
+    if (membershipError || !membership) {
+      return new Response(
+        JSON.stringify({ error: 'Usuario sin studio asignado. Contactá al administrador.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
     // Determinar redirect según rol
-    const redirectTo = studio?.is_superadmin ? '/admin' : '/studio'
+    const redirectTo = superadmin ? '/admin' : '/studio'
 
+    // Las cookies de Supabase se setean automáticamente via setAll()
     return new Response(JSON.stringify({ success: true, redirectTo }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
