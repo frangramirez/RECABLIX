@@ -22,6 +22,7 @@ interface Studio {
   is_active: boolean
   created_at: string
   updated_at: string
+  role?: string
 }
 
 declare namespace App {

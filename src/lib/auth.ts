@@ -43,9 +43,24 @@ export async function getStudioFromSession(cookies: AstroCookies, request?: Requ
 
   if (!membership?.studios) return null
 
-  // Agregar flag de superadmin al studio
+  // membership.studios puede ser array u objeto dependiendo del query
+  // Lo tratamos como unknown y extraemos los campos necesarios
+  const studios = membership.studios as unknown
+  const studioData = (Array.isArray(studios) ? studios[0] : studios) as {
+    id: string
+    auth_user_id: string | null
+    name: string
+    email: string
+    cuit: string | null
+    is_active: boolean
+    created_at: string
+    updated_at: string
+  } | undefined
+
+  if (!studioData) return null
+
   return {
-    ...membership.studios,
+    ...studioData,
     is_superadmin: !!superadmin,
     role: membership.role,
   }

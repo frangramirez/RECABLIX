@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { createServerClient, parseCookieHeader, serializeCookieHeader } from '@supabase/ssr'
+import { createServerClient, parseCookieHeader } from '@supabase/ssr'
 import type { AstroCookies } from 'astro'
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL
@@ -23,14 +23,15 @@ export const supabaseAdmin = supabaseServiceKey
 export function createSupabaseServerClient(cookies: AstroCookies, request?: Request) {
   return createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
-      getAll() {
+      getAll(): { name: string; value: string }[] {
         // Si tenemos request, parsear todas las cookies del header usando utilidad de Supabase
         if (request) {
           const cookieHeader = request.headers.get('cookie')
           if (!cookieHeader) return []
 
           // parseCookieHeader maneja correctamente el encoding de Supabase (base64-, etc)
-          return parseCookieHeader(cookieHeader)
+          const parsed = parseCookieHeader(cookieHeader)
+          return parsed.filter((c): c is { name: string; value: string } => typeof c.value === 'string')
         }
 
         // Fallback: Astro no expone getAll, leer cookies conocidas
@@ -42,7 +43,7 @@ export function createSupabaseServerClient(cookies: AstroCookies, request?: Requ
         const result: { name: string; value: string }[] = []
         for (const name of cookieNames) {
           const cookie = cookies.get(name)
-          if (cookie) {
+          if (cookie?.value) {
             result.push({ name, value: cookie.value })
           }
         }
@@ -63,7 +64,7 @@ export function createSupabaseServerClient(cookies: AstroCookies, request?: Requ
 }
 
 // Helper para obtener los Set-Cookie headers de cookies que fueron set
-export function getCookieHeaders(cookies: AstroCookies): string[] {
+export function getCookieHeaders(_cookies: AstroCookies): string[] {
   // Astro no expone una forma de obtener las cookies que fueron set
   // Como workaround, retornamos un array vacío y confiamos en que
   // Astro serializará las cookies automáticamente si no retornamos Response manual
