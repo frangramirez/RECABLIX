@@ -14,6 +14,7 @@ interface ClientData {
   id?: string
   name: string
   cuit: string | null
+  uses_recablix: boolean
   activity: 'BIENES' | 'SERVICIOS' | 'LOCACION' | 'SOLO_LOC_2_INM'
   province_code: string
   works_in_rd: boolean
@@ -70,6 +71,7 @@ export function ClientForm({ initialData, studioId }: Props) {
   const [formData, setFormData] = useState<ClientData>({
     name: initialData?.name || '',
     cuit: initialData?.cuit || null,
+    uses_recablix: initialData?.uses_recablix ?? true, // Por defecto activo para nuevos clientes
     activity: initialData?.activity || 'SERVICIOS',
     province_code: initialData?.province_code || '901',
     works_in_rd: initialData?.works_in_rd || false,
@@ -119,11 +121,28 @@ export function ClientForm({ initialData, studioId }: Props) {
     try {
       if (initialData?.id) {
         // UPDATE: actualizar clients y reca_client_data
+        // Primero obtenemos el array apps actual
+        const { data: currentClient } = await supabase
+          .from('clients')
+          .select('apps')
+          .eq('id', initialData.id)
+          .single()
+
+        let currentApps: string[] = (currentClient?.apps as string[]) || []
+
+        // Actualizar array apps según el switch
+        if (formData.uses_recablix && !currentApps.includes('recablix')) {
+          currentApps = [...currentApps, 'recablix']
+        } else if (!formData.uses_recablix && currentApps.includes('recablix')) {
+          currentApps = currentApps.filter(app => app !== 'recablix')
+        }
+
         const { error: clientError } = await supabase
           .from('clients')
           .update({
             name: formData.name,
             cuit: formData.cuit?.trim() || null,
+            apps: currentApps,
           })
           .eq('id', initialData.id)
 
@@ -161,7 +180,7 @@ export function ClientForm({ initialData, studioId }: Props) {
             studio_id: studioId,
             name: formData.name,
             cuit: formData.cuit?.trim() || null,
-            apps: ['recablix'],
+            apps: formData.uses_recablix ? ['recablix'] : [],
             fiscal_year: new Date().getFullYear(),
           })
           .select()
@@ -212,6 +231,18 @@ export function ClientForm({ initialData, studioId }: Props) {
       <Card>
         <CardContent className="pt-6 space-y-4">
           <h3 className="font-semibold">Datos Básicos</h3>
+
+          {/* Switch para habilitar recategorización */}
+          <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <div>
+              <Label className="text-blue-900">Incluir en Recategorización</Label>
+              <p className="text-xs text-blue-700">Este cliente aparecerá en el panel de recategorización</p>
+            </div>
+            <Switch
+              checked={formData.uses_recablix}
+              onCheckedChange={(v) => updateField('uses_recablix', v)}
+            />
+          </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
