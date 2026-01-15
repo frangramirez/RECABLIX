@@ -4,7 +4,8 @@ import {
   LayoutDashboard,
   FileText,
   Settings,
-  Shield
+  Shield,
+  Receipt
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/components/providers/SessionProvider'
@@ -12,6 +13,7 @@ import { useSession } from '@/components/providers/SessionProvider'
 const navigation = [
   { name: 'Dashboard', href: '/studio', icon: LayoutDashboard },
   { name: 'Clientes', href: '/studio/clients', icon: Users },
+  { name: 'Operaciones', href: '/studio/operations', icon: Receipt },
   { name: 'Recategorización', href: '/studio/recategorization', icon: BarChart3 },
   { name: 'Reportes', href: '/studio/reports', icon: FileText },
 ]
