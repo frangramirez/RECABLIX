@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Eye, Building2, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react'
+import { Search, Eye, Building2, ArrowRight, TrendingUp, TrendingDown, FileText, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import type { GlobalClient } from '@/pages/api/admin/clients'
 
@@ -38,12 +38,13 @@ interface PeriodInfo {
 
 // Helper para leer URL params
 function getInitialParams() {
-  if (typeof window === 'undefined') return { search: '', studio: '', category: '' }
+  if (typeof window === 'undefined') return { search: '', studio: '', category: '', prevCategory: '' }
   const params = new URLSearchParams(window.location.search)
   return {
     search: params.get('search') || '',
     studio: params.get('studio') || '',
     category: params.get('category') || '',
+    prevCategory: params.get('prev_category') || '',
   }
 }
 
@@ -58,6 +59,7 @@ export function ClientsGlobalManager() {
   const [searchTerm, setSearchTerm] = useState(initialParams.search)
   const [studioFilter, setStudioFilter] = useState<string>(initialParams.studio)
   const [categoryFilter, setCategoryFilter] = useState<string>(initialParams.category)
+  const [prevCategoryFilter, setPrevCategoryFilter] = useState<string>(initialParams.prevCategory)
 
   // Modal
   const [selectedClient, setSelectedClient] = useState<GlobalClient | null>(null)
@@ -74,6 +76,7 @@ export function ClientsGlobalManager() {
     if (searchTerm) params.set('search', searchTerm)
     if (studioFilter && studioFilter !== 'all') params.set('studio', studioFilter)
     if (categoryFilter && categoryFilter !== 'all') params.set('category', categoryFilter)
+    if (prevCategoryFilter && prevCategoryFilter !== 'all') params.set('prev_category', prevCategoryFilter)
 
     const newUrl = params.toString()
       ? `${window.location.pathname}?${params.toString()}`
@@ -83,7 +86,7 @@ export function ClientsGlobalManager() {
     if (window.location.search !== (newUrl.includes('?') ? newUrl.split('?')[1] : '')) {
       history.replaceState(null, '', newUrl)
     }
-  }, [searchTerm, studioFilter, categoryFilter])
+  }, [searchTerm, studioFilter, categoryFilter, prevCategoryFilter])
 
   async function fetchClients() {
     try {
@@ -117,12 +120,17 @@ export function ClientsGlobalManager() {
     }
 
     // Filtro por estudio
-    if (studioFilter && client.studio_id !== studioFilter) {
+    if (studioFilter && studioFilter !== 'all' && client.studio_id !== studioFilter) {
       return false
     }
 
     // Filtro por categoría nueva
-    if (categoryFilter && client.new_category !== categoryFilter) {
+    if (categoryFilter && categoryFilter !== 'all' && client.new_category !== categoryFilter) {
+      return false
+    }
+
+    // Filtro por categoría anterior
+    if (prevCategoryFilter && prevCategoryFilter !== 'all' && client.previous_category !== prevCategoryFilter) {
       return false
     }
 
@@ -199,21 +207,35 @@ export function ClientsGlobalManager() {
           </SelectContent>
         </Select>
 
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[160px]">
-            <SelectValue placeholder="Categoría" />
+        <Select value={prevCategoryFilter} onValueChange={setPrevCategoryFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Cat. Ant." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todas</SelectItem>
+            <SelectItem value="all">Cat. Ant.</SelectItem>
             {CATEGORIES.map((cat) => (
               <SelectItem key={cat} value={cat}>
-                Categoría {cat}
+                {cat}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
 
-        {(studioFilter || categoryFilter || searchTerm) && (
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[140px]">
+            <SelectValue placeholder="Cat. Nueva" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Cat. Nueva</SelectItem>
+            {CATEGORIES.map((cat) => (
+              <SelectItem key={cat} value={cat}>
+                {cat}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {(studioFilter || categoryFilter || prevCategoryFilter || searchTerm) && (
           <Button
             variant="ghost"
             size="sm"
@@ -221,6 +243,7 @@ export function ClientsGlobalManager() {
               setSearchTerm('')
               setStudioFilter('')
               setCategoryFilter('')
+              setPrevCategoryFilter('')
             }}
           >
             Limpiar filtros
@@ -231,7 +254,7 @@ export function ClientsGlobalManager() {
       {/* Conteo */}
       <p className="text-sm text-muted-foreground">
         {filteredClients.length} cliente{filteredClients.length !== 1 ? 's' : ''}
-        {(studioFilter || categoryFilter || searchTerm) && ` (de ${clients.length} total)`}
+        {(studioFilter || categoryFilter || prevCategoryFilter || searchTerm) && ` (de ${clients.length} total)`}
       </p>
 
       {/* Tabla */}
@@ -254,7 +277,7 @@ export function ClientsGlobalManager() {
               <TableRow>
                 <TableCell colSpan={8} className="text-center py-8">
                   <p className="text-muted-foreground">
-                    {searchTerm || studioFilter || categoryFilter
+                    {searchTerm || studioFilter || categoryFilter || prevCategoryFilter
                       ? 'No hay clientes que coincidan con los filtros.'
                       : 'No hay clientes registrados con RECABLIX.'}
                   </p>
@@ -408,6 +431,30 @@ export function ClientsGlobalManager() {
                     )
                   })()}
                 </div>
+              </div>
+
+              {/* Acciones */}
+              <div className="flex gap-2 pt-2 border-t">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    window.open(`/api/admin/pdf/${selectedClient.id}`, '_blank')
+                  }}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Ver PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    toast.info('Próximamente: Integración con Brevo para envío de emails')
+                  }}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Enviar por Email
+                </Button>
               </div>
 
               {/* Nota informativa */}
