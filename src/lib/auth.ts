@@ -1,8 +1,80 @@
 import type { AstroCookies } from 'astro'
+import type { User } from '@supabase/supabase-js'
 import { createSupabaseServerClient, supabaseAdmin } from './supabase'
 import { getTenantSchemaName } from './config'
 
 export { createSupabaseServerClient, getTenantSchemaName }
+
+/**
+ * Permisos granulares del usuario en un studio
+ */
+export interface UserPermissions {
+  can_view_billing: boolean
+  can_manage_subscriptions: boolean
+  can_delete_members: boolean
+  can_delete_clients: boolean
+  can_export_data: boolean
+  can_import_data: boolean
+  can_generate_reports: boolean
+}
+
+/**
+ * Sesión extendida con permisos y tenant schema
+ */
+export interface SessionWithPermissions {
+  user: User
+  studio: {
+    id: string
+    name: string
+    slug: string
+  }
+  role: 'owner' | 'admin' | 'collaborator' | 'client'
+  is_superadmin: boolean
+  permissions: UserPermissions
+  tenant_schema: string
+}
+
+/**
+ * Permisos por defecto según rol
+ */
+const DEFAULT_PERMISSIONS: Record<string, Partial<UserPermissions>> = {
+  owner: {
+    can_view_billing: true,
+    can_manage_subscriptions: true,
+    can_delete_members: true,
+    can_delete_clients: true,
+    can_export_data: true,
+    can_import_data: true,
+    can_generate_reports: true,
+  },
+  admin: {
+    can_view_billing: false,
+    can_manage_subscriptions: false,
+    can_delete_members: false,
+    can_delete_clients: true,
+    can_export_data: true,
+    can_import_data: true,
+    can_generate_reports: true,
+  },
+  collaborator: {
+    can_view_billing: false,
+    can_manage_subscriptions: false,
+    can_delete_members: false,
+    can_delete_clients: false,
+    can_export_data: true,
+    can_import_data: true,
+    can_generate_reports: true,
+  },
+  client: {
+    can_view_billing: false,
+    can_manage_subscriptions: false,
+    can_delete_members: false,
+    can_delete_clients: false,
+    can_export_data: false,
+    can_import_data: false,
+    can_generate_reports: true,
+  },
+}
 
 /**
  * Obtiene la sesión actual de Supabase
@@ -16,14 +88,17 @@ export async function getSession(cookies: AstroCookies) {
 }
 
 /**
- * Obtiene el studio asociado al usuario autenticado
+ * Obtiene el studio asociado al usuario autenticado con permisos
  * Retorna null si no hay sesión o no existe el studio
  *
  * NOTA: Usamos supabaseAdmin para las queries de DB porque las políticas RLS
  * en superadmins y studio_members tienen recursión infinita. Esto es seguro
  * porque getUser() ya validó el JWT del usuario.
  */
-export async function getStudioFromSession(cookies: AstroCookies, request?: Request) {
+export async function getStudioFromSession(
+  cookies: AstroCookies,
+  request?: Request
+): Promise<SessionWithPermissions | null> {
   const supabase = createSupabaseServerClient(cookies, request)
   const {
     data: { user },
@@ -45,10 +120,12 @@ export async function getStudioFromSession(cookies: AstroCookies, request?: Requ
     .eq('is_active', true)
     .single()
 
+  const is_superadmin = !!superadmin
+
   // Obtener studio desde studio_members (limit 1 en caso de múltiples membresías)
   const { data: memberships } = await supabaseAdmin
     .from('studio_members')
-    .select('studio_id, role, studios(*)')
+    .select('studio_id, role, permissions, studios(*)')
     .eq('user_id', user.id)
     .limit(1)
 
@@ -68,13 +145,55 @@ export async function getStudioFromSession(cookies: AstroCookies, request?: Requ
 
   if (!studioData) return null
 
+  const role = membership.role as 'owner' | 'admin' | 'collaborator' | 'client'
+
+  // Calcular permisos
+  let permissions: UserPermissions
+
+  if (is_superadmin || role === 'owner') {
+    // Superadmin y owner tienen todos los permisos
+    permissions = {
+      can_view_billing: true,
+      can_manage_subscriptions: true,
+      can_delete_members: true,
+      can_delete_clients: true,
+      can_export_data: true,
+      can_import_data: true,
+      can_generate_reports: true,
+    }
+  } else {
+    // Obtener permisos por defecto del rol
+    const defaultPerms = DEFAULT_PERMISSIONS[role] || DEFAULT_PERMISSIONS.collaborator
+
+    // Mergear con permisos personalizados del usuario (si existen)
+    const customPerms = (membership.permissions as Partial<UserPermissions>) || {}
+
+    permissions = {
+      can_view_billing: customPerms.can_view_billing ?? defaultPerms.can_view_billing ?? false,
+      can_manage_subscriptions:
+        customPerms.can_manage_subscriptions ?? defaultPerms.can_manage_subscriptions ?? false,
+      can_delete_members: customPerms.can_delete_members ?? defaultPerms.can_delete_members ?? false,
+      can_delete_clients: customPerms.can_delete_clients ?? defaultPerms.can_delete_clients ?? false,
+      can_export_data: customPerms.can_export_data ?? defaultPerms.can_export_data ?? true,
+      can_import_data: customPerms.can_import_data ?? defaultPerms.can_import_data ?? true,
+      can_generate_reports:
+        customPerms.can_generate_reports ?? defaultPerms.can_generate_reports ?? true,
+    }
+  }
+
+  const tenant_schema = getTenantSchemaName(studioData.id)
+
   return {
-    id: studioData.id,
-    name: studioData.name,
-    slug: studioData.slug,
-    is_superadmin: !!superadmin,
-    role: membership.role,
-    schema_name: getTenantSchemaName(studioData.id),
+    user,
+    studio: {
+      id: studioData.id,
+      name: studioData.name,
+      slug: studioData.slug,
+    },
+    role,
+    is_superadmin,
+    permissions,
+    tenant_schema,
   }
 }
 
