@@ -1,7 +1,8 @@
 import type { AstroCookies } from 'astro'
 import { createSupabaseServerClient, supabaseAdmin } from './supabase'
+import { getTenantSchemaName } from './config'
 
-export { createSupabaseServerClient }
+export { createSupabaseServerClient, getTenantSchemaName }
 
 /**
  * Obtiene la sesión actual de Supabase
@@ -73,6 +74,7 @@ export async function getStudioFromSession(cookies: AstroCookies, request?: Requ
     slug: studioData.slug,
     is_superadmin: !!superadmin,
     role: membership.role,
+    schema_name: getTenantSchemaName(studioData.id),
   }
 }
 

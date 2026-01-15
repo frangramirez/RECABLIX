@@ -1,5 +1,7 @@
-import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect } from 'react'
+import { useSession } from '@/components/providers/SessionProvider'
+import { useTenantSupabase } from '@/hooks/useTenantSupabase'
+import { config } from '@/lib/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -67,6 +69,14 @@ export function ClientForm({ initialData, studioId }: Props) {
   const [loading, setLoading] = useState(false)
   const [cuitError, setCuitError] = useState<string | null>(null)
   const [lessorCuitError, setLessorCuitError] = useState<string | null>(null)
+
+  // Tenant queries
+  const session = useSession()
+  const tenantContext = session.studio
+    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+    : null
+  const { query } = useTenantSupabase(tenantContext)
+
   const [formData, setFormData] = useState<ClientData>({
     name: initialData?.name || '',
     cuit: initialData?.cuit || null,
@@ -119,8 +129,7 @@ export function ClientForm({ initialData, studioId }: Props) {
     try {
       if (initialData?.id) {
         // UPDATE: actualizar clients y reca_client_data
-        const { error: clientError } = await supabase
-          .from('clients')
+        const { error: clientError } = await query('clients')
           .update({
             name: formData.name,
             cuit: formData.cuit?.trim() || null,
@@ -129,8 +138,7 @@ export function ClientForm({ initialData, studioId }: Props) {
 
         if (clientError) throw clientError
 
-        const { error: recaError } = await supabase
-          .from('reca_client_data')
+        const { error: recaError } = await query('reca_client_data')
           .upsert({
             client_id: initialData.id,
             activity: formData.activity,
@@ -155,22 +163,30 @@ export function ClientForm({ initialData, studioId }: Props) {
         toast({ title: 'Actualizado', description: 'Cliente actualizado correctamente' })
       } else {
         // CREATE: insertar en clients y luego en reca_client_data
-        const { data: newClient, error: clientError } = await supabase
-          .from('clients')
-          .insert({
-            studio_id: studioId,
-            name: formData.name,
-            cuit: formData.cuit?.trim() || null,
-            apps: ['recablix'],
-            fiscal_year: new Date().getFullYear(),
-          })
+        // En tenant schema no hay studio_id (aislamiento por schema)
+        const clientInsertData = config.USE_TENANT_SCHEMAS
+          ? {
+              name: formData.name,
+              cuit: formData.cuit?.trim() || null,
+              apps: ['recablix'],
+              fiscal_year: new Date().getFullYear(),
+            }
+          : {
+              studio_id: studioId,
+              name: formData.name,
+              cuit: formData.cuit?.trim() || null,
+              apps: ['recablix'],
+              fiscal_year: new Date().getFullYear(),
+            }
+
+        const { data: newClient, error: clientError } = await query('clients')
+          .insert(clientInsertData)
           .select()
           .single()
 
         if (clientError) throw clientError
 
-        const { error: recaError } = await supabase
-          .from('reca_client_data')
+        const { error: recaError } = await query('reca_client_data')
           .insert({
             client_id: newClient.id,
             activity: formData.activity,

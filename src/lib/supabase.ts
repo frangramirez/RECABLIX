@@ -1,6 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { createServerClient, parseCookieHeader } from '@supabase/ssr'
 import type { AstroCookies } from 'astro'
+import { config, isTenantTable } from './config'
 
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY
@@ -72,4 +73,43 @@ export function getCookieHeaders(_cookies: AstroCookies): string[] {
   // Como workaround, retornamos un array vacío y confiamos en que
   // Astro serializará las cookies automáticamente si no retornamos Response manual
   return []
+}
+
+// ============================================================================
+// TENANT SCHEMA HELPERS
+// ============================================================================
+
+/**
+ * Crea una query que usa el schema correcto basado en la tabla
+ * Si USE_TENANT_SCHEMAS está activo y la tabla es de tenant, usa el tenant schema
+ * De lo contrario, usa el schema public (comportamiento default)
+ *
+ * @param client - Cliente Supabase a usar
+ * @param schemaName - Nombre del tenant schema (tenant_xxxx_xxxx...)
+ * @param tableName - Nombre de la tabla a consultar
+ */
+export function createTenantQuery<T extends SupabaseClient>(
+  client: T,
+  schemaName: string,
+  tableName: string
+) {
+  if (config.USE_TENANT_SCHEMAS && isTenantTable(tableName)) {
+    return client.schema(schemaName).from(tableName)
+  }
+  return client.from(tableName)
+}
+
+/**
+ * Helper factory que crea una función query para un schema específico
+ * Útil para evitar pasar schemaName en cada llamada
+ *
+ * @example
+ * const query = createTenantQueryFactory(supabase, 'tenant_xxx')
+ * const { data } = await query('clients').select('*')
+ */
+export function createTenantQueryFactory(
+  client: SupabaseClient,
+  schemaName: string
+) {
+  return (tableName: string) => createTenantQuery(client, schemaName, tableName)
 }

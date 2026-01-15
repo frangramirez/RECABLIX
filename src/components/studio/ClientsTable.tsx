@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useSession } from '@/components/providers/SessionProvider'
+import { useTenantSupabase } from '@/hooks/useTenantSupabase'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -39,13 +40,22 @@ export function ClientsTable() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const { toast } = useToast()
 
+  // Obtener contexto del tenant para queries
+  const session = useSession()
+  const tenantContext = session.studio
+    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+    : null
+  const { query, isReady } = useTenantSupabase(tenantContext)
+
   useEffect(() => {
-    fetchClients()
-  }, [])
+    if (isReady) {
+      fetchClients()
+    }
+  }, [isReady])
 
   const fetchClients = async () => {
-    const { data, error } = await supabase
-      .from('clients')
+    // Query usa tenant schema si USE_TENANT_SCHEMAS=true
+    const { data, error } = await query('clients')
       .select(`
         id,
         name,
@@ -86,7 +96,7 @@ export function ClientsTable() {
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`¿Eliminar cliente "${name}"? También se eliminarán sus transacciones.`)) return
 
-    const { error } = await supabase.from('clients').delete().eq('id', id)
+    const { error } = await query('clients').delete().eq('id', id)
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: error.message })
     } else {
@@ -96,8 +106,7 @@ export function ClientsTable() {
   }
 
   const handleExport = async () => {
-    const { data } = await supabase
-      .from('clients')
+    const { data } = await query('clients')
       .select(`
         name,
         cuit,

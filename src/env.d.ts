@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly SUPABASE_SERVICE_KEY: string
   readonly PUBLIC_APP_URL: string
   readonly SUPERADMIN_EMAIL: string
+  readonly PUBLIC_USE_TENANT_SCHEMAS: string
 }
 
 interface ImportMeta {
@@ -14,15 +15,12 @@ interface ImportMeta {
 
 interface Studio {
   id: string
-  auth_user_id: string | null
   name: string
-  email: string
-  cuit: string | null
+  slug: string
   is_superadmin: boolean
-  is_active: boolean
-  created_at: string
-  updated_at: string
   role?: string
+  /** Nombre del tenant schema (tenant_xxxx_xxxx...) */
+  schema_name: string
 }
 
 declare namespace App {

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useSession } from '@/components/providers/SessionProvider'
+import { useTenantSupabase } from '@/hooks/useTenantSupabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -36,13 +37,21 @@ export function TransactionsManager({ clientId, activePeriod }: Props) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const { toast } = useToast()
 
+  // Tenant queries
+  const session = useSession()
+  const tenantContext = session.studio
+    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+    : null
+  const { query, isReady } = useTenantSupabase(tenantContext)
+
   useEffect(() => {
-    fetchTransactions()
-  }, [])
+    if (isReady) {
+      fetchTransactions()
+    }
+  }, [isReady])
 
   const fetchTransactions = async () => {
-    const { data, error } = await supabase
-      .from('reca_transactions')
+    const { data, error } = await query('reca_transactions')
       .select('*')
       .eq('client_id', clientId)
       .order('period', { ascending: false })
@@ -71,10 +80,10 @@ export function TransactionsManager({ clientId, activePeriod }: Props) {
 
     let error
     if (editingTransaction) {
-      const result = await supabase.from('reca_transactions').update(data).eq('id', editingTransaction.id)
+      const result = await query('reca_transactions').update(data).eq('id', editingTransaction.id)
       error = result.error
     } else {
-      const result = await supabase.from('reca_transactions').insert(data)
+      const result = await query('reca_transactions').insert(data)
       error = result.error
     }
 
@@ -90,7 +99,7 @@ export function TransactionsManager({ clientId, activePeriod }: Props) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta transacción?')) return
-    const { error } = await supabase.from('reca_transactions').delete().eq('id', id)
+    const { error } = await query('reca_transactions').delete().eq('id', id)
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: error.message })
     } else {
@@ -120,7 +129,7 @@ export function TransactionsManager({ clientId, activePeriod }: Props) {
         description: row.Descripcion || null,
       }
 
-      const { error } = await supabase.from('reca_transactions').insert(txData)
+      const { error } = await query('reca_transactions').insert(txData)
       if (!error) success++
     }
 

@@ -5,6 +5,8 @@ export interface StudioSession {
   name: string
   slug: string
   is_superadmin: boolean
+  /** Nombre del tenant schema (tenant_xxxx_xxxx...) */
+  schema_name: string
 }
 
 export interface SessionStore {

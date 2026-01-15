@@ -1,5 +1,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useSession } from '@/components/providers/SessionProvider'
+import { useTenantSupabase } from '@/hooks/useTenantSupabase'
+import { config } from '@/lib/config'
 import {
   calculateRecategorizationFromData,
   getScalesForPeriod,
@@ -47,21 +50,30 @@ export function RecategorizationView({
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set())
   const [generatingPdfs, setGeneratingPdfs] = useState(false)
 
+  // Tenant queries
+  const session = useSession()
+  const tenantContext = session.studio
+    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+    : null
+  const { query, publicQuery, isReady } = useTenantSupabase(tenantContext)
+
   // Cache de escalas y componentes para recálculo
   const [cachedScales, setCachedScales] = useState<Scale[] | null>(null)
   const [cachedFeeComponents, setCachedFeeComponents] = useState<FeeComponentData[] | null>(null)
 
   useEffect(() => {
-    calculateAll()
-  }, [])
+    if (isReady) {
+      calculateAll()
+    }
+  }, [isReady])
 
   const calculateAll = async () => {
     setLoading(true)
 
     try {
       // 1. Obtener clientes con datos de reca en UNA query
-      const { data: clientsWithData, error: clientsError } = await supabase
-        .from('clients')
+      // En tenant schema no filtramos por studio_id (aislamiento por schema)
+      let clientsQuery = query('clients')
         .select(`
           id, name,
           reca_client_data (
@@ -70,8 +82,14 @@ export function RecategorizationView({
             previous_category, previous_fee
           )
         `)
-        .eq('studio_id', studioId)
         .contains('apps', ['recablix'])
+
+      // Solo agregar filtro studio_id si NO usamos tenant schemas
+      if (!config.USE_TENANT_SCHEMAS) {
+        clientsQuery = clientsQuery.eq('studio_id', studioId)
+      }
+
+      const { data: clientsWithData, error: clientsError } = await clientsQuery
 
       if (clientsError) {
         toast.error('Error al cargar clientes', { description: clientsError.message })
@@ -87,8 +105,7 @@ export function RecategorizationView({
 
       // 2. Obtener TODAS las transacciones del período en UNA query
       const clientIds = clientsWithData.map(c => c.id)
-      const { data: allTx, error: txError } = await supabase
-        .from('reca_transactions')
+      const { data: allTx, error: txError } = await query('reca_transactions')
         .select('client_id, transaction_type, amount')
         .in('client_id', clientIds)
         .gte('period', salesPeriodStart)
