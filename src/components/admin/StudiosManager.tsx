@@ -21,7 +21,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Users, FileText, Building2, Download, Upload } from 'lucide-react'
+import { Plus, Users, FileText, Building2, Download, Upload, UserCog } from 'lucide-react'
 import { toast } from 'sonner'
 import { UsersTab } from './UsersTab'
 import * as XLSX from 'xlsx'
@@ -205,6 +205,31 @@ export function StudiosManager() {
     toast.success('Estudios exportados correctamente')
   }
 
+  async function handleImpersonate(studioId: string, studioName: string) {
+    try {
+      const response = await fetch('/api/admin/impersonate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ studio_id: studioId }),
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success(`Impersonando estudio: ${studioName}`)
+
+      // Redirigir al panel de studio
+      window.location.href = data.redirect || '/studio'
+    } catch (error) {
+      console.error('Error al impersonar:', error)
+      toast.error('Error al iniciar impersonación')
+    }
+  }
+
   async function handleImportStudios(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
@@ -356,12 +381,13 @@ export function StudiosManager() {
                     <TableHead className="text-center">Miembros</TableHead>
                     <TableHead className="text-center">Clientes RECABLIX</TableHead>
                     <TableHead>Registro</TableHead>
+                    <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {studios.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8">
+                      <TableCell colSpan={6} className="text-center py-8">
                         <p className="text-muted-foreground">
                           No hay estudios registrados. Crea uno nuevo.
                         </p>
@@ -397,6 +423,17 @@ export function StudiosManager() {
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(studio.created_at).toLocaleDateString('es-AR')}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleImpersonate(studio.id, studio.name)}
+                            title="Acceder como owner de este estudio"
+                          >
+                            <UserCog className="h-4 w-4 mr-2" />
+                            Impersonar
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))

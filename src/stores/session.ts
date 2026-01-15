@@ -1,5 +1,15 @@
 import { atom } from 'nanostores'
 
+export interface UserPermissions {
+  can_view_billing: boolean
+  can_manage_subscriptions: boolean
+  can_delete_members: boolean
+  can_delete_clients: boolean
+  can_export_data: boolean
+  can_import_data: boolean
+  can_generate_reports: boolean
+}
+
 export interface StudioSession {
   id: string
   name: string
@@ -11,6 +21,9 @@ export interface StudioSession {
 
 export interface SessionStore {
   studio: StudioSession | null
+  role?: 'owner' | 'admin' | 'collaborator' | 'client'
+  is_superadmin?: boolean
+  permissions?: UserPermissions
   isLoading: boolean
 }
 
@@ -19,8 +32,13 @@ export const $session = atom<SessionStore>({
   isLoading: true,
 })
 
-export function setSession(studio: StudioSession | null) {
-  $session.set({ studio, isLoading: false })
+export function setSession(
+  studio: StudioSession | null,
+  role?: 'owner' | 'admin' | 'collaborator' | 'client',
+  is_superadmin?: boolean,
+  permissions?: UserPermissions
+) {
+  $session.set({ studio, role, is_superadmin, permissions, isLoading: false })
 }
 
 export function clearSession() {

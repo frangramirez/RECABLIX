@@ -30,6 +30,7 @@ export interface SessionWithPermissions {
   }
   role: 'owner' | 'admin' | 'collaborator' | 'client'
   is_superadmin: boolean
+  is_impersonating?: boolean
   permissions: UserPermissions
   tenant_schema: string
 }
@@ -122,7 +123,50 @@ export async function getStudioFromSession(
 
   const is_superadmin = !!superadmin
 
-  // Obtener studio desde studio_members (limit 1 en caso de múltiples membresías)
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // IMPERSONACIÓN: Si superadmin tiene cookie, usar ese studio
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const impersonatingStudioId = cookies.get('impersonating_studio')?.value
+
+  if (impersonatingStudioId && is_superadmin) {
+    // Cargar studio impersonado
+    const { data: impersonatedStudio } = await supabaseAdmin
+      .from('studios')
+      .select('id, name, slug')
+      .eq('id', impersonatingStudioId)
+      .single()
+
+    if (impersonatedStudio) {
+      const tenant_schema = getTenantSchemaName(impersonatedStudio.id)
+
+      // Superadmin actúa como owner con todos los permisos
+      return {
+        user,
+        studio: {
+          id: impersonatedStudio.id,
+          name: impersonatedStudio.name,
+          slug: impersonatedStudio.slug,
+        },
+        role: 'owner',
+        is_superadmin: true,
+        is_impersonating: true,
+        permissions: {
+          can_view_billing: true,
+          can_manage_subscriptions: true,
+          can_delete_members: true,
+          can_delete_clients: true,
+          can_export_data: true,
+          can_import_data: true,
+          can_generate_reports: true,
+        },
+        tenant_schema,
+      }
+    }
+  }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // FLUJO NORMAL: Obtener studio desde studio_members
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   const { data: memberships } = await supabaseAdmin
     .from('studio_members')
     .select('studio_id, role, permissions, studios(*)')

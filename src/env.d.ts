@@ -18,6 +18,7 @@ interface Studio {
   name: string
   slug: string
   is_superadmin: boolean
+  is_impersonating?: boolean
   role?: string
   /** Nombre del tenant schema (tenant_xxxx_xxxx...) */
   schema_name: string

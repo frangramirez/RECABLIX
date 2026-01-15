@@ -186,7 +186,7 @@ export function MembersManager() {
   const handleDeleteMember = async (memberId: string) => {
     if (!confirm('¿Estás seguro de eliminar este miembro?')) return
 
-    if (!permissions.can_delete_members && !is_superadmin && role !== 'owner') {
+    if (!permissions?.can_delete_members && !is_superadmin && role !== 'owner') {
       toast.error('No tienes permiso para eliminar miembros')
       return
     }
@@ -318,7 +318,7 @@ export function MembersManager() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          {(permissions.can_delete_members ||
+                          {(permissions?.can_delete_members ||
                             is_superadmin ||
                             role === 'owner') && (
                             <Button
