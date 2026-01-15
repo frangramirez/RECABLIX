@@ -1,0 +1,45 @@
+---
+/**
+ * Página de Configuración del Studio
+ *
+ * Permite a owners/admins gestionar miembros y permisos
+ */
+import { getStudioFromSession } from '@/lib/auth'
+import { MembersManager } from '@/components/studio/MembersManager'
+
+const session = await getStudioFromSession(Astro.cookies, Astro.request)
+
+if (!session) {
+  return Astro.redirect('/login')
+}
+
+// Solo owner y admin pueden acceder
+if (!session.is_superadmin && session.role !== 'owner' && session.role !== 'admin') {
+  return Astro.redirect('/studio')
+}
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Configuración - {session.studio.name}</title>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <div class="max-w-6xl mx-auto p-6">
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">Configuración del Studio</h1>
+      <p class="text-gray-600 mt-1">{session.studio.name}</p>
+    </div>
+
+    <div class="bg-white rounded-lg border p-6">
+      <MembersManager client:load />
+    </div>
+
+    <div class="mt-4">
+      <a href="/studio" class="text-blue-600 hover:underline">← Volver al Studio</a>
+    </div>
+  </div>
+</body>
+</html>

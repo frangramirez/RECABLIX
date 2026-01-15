@@ -1,0 +1,76 @@
+---
+/**
+ * Página Admin - Gestión de Miembros de un Studio
+ *
+ * Permite a superadmin gestionar miembros y permisos de cualquier studio
+ */
+import { getStudioFromSession } from '@/lib/auth'
+import { MembersManager } from '@/components/studio/MembersManager'
+import { createSupabaseServerClient } from '@/lib/supabase'
+
+const session = await getStudioFromSession(Astro.cookies, Astro.request)
+
+if (!session) {
+  return Astro.redirect('/login')
+}
+
+// Solo superadmin puede acceder
+if (!session.is_superadmin) {
+  return Astro.redirect('/studio')
+}
+
+const { id } = Astro.params
+
+if (!id) {
+  return Astro.redirect('/admin/studios')
+}
+
+// Obtener información del studio
+const supabase = createSupabaseServerClient(Astro.cookies, Astro.request)
+const { data: studio } = await supabase
+  .from('studios')
+  .select('id, name, slug')
+  .eq('id', id)
+  .single()
+
+if (!studio) {
+  return Astro.redirect('/admin/studios')
+}
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestión de Miembros - {studio.name}</title>
+</head>
+<body class="min-h-screen bg-gray-50">
+  <div class="max-w-6xl mx-auto p-6">
+    <div class="mb-6">
+      <div class="flex items-center gap-2 text-sm text-gray-600 mb-2">
+        <a href="/admin" class="hover:underline">Admin</a>
+        <span>›</span>
+        <a href="/admin/studios" class="hover:underline">Studios</a>
+        <span>›</span>
+        <span>{studio.name}</span>
+      </div>
+      <h1 class="text-2xl font-bold text-gray-900">Gestión de Miembros</h1>
+      <p class="text-gray-600 mt-1">{studio.name} - {studio.slug}</p>
+      <div class="mt-2">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+          SuperAdmin
+        </span>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-lg border p-6">
+      <MembersManager client:load />
+    </div>
+
+    <div class="mt-4">
+      <a href="/admin/studios" class="text-blue-600 hover:underline">← Volver a Studios</a>
+    </div>
+  </div>
+</body>
+</html>
