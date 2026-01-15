@@ -3,7 +3,7 @@ import { atom } from 'nanostores'
 export interface StudioSession {
   id: string
   name: string
-  email: string
+  slug: string
   is_superadmin: boolean
 }
 

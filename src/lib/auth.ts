@@ -59,11 +59,8 @@ export async function getStudioFromSession(cookies: AstroCookies, request?: Requ
   const studios = membership.studios as unknown
   const studioData = (Array.isArray(studios) ? studios[0] : studios) as {
     id: string
-    auth_user_id: string | null
     name: string
-    email: string
-    cuit: string | null
-    is_active: boolean
+    slug: string
     created_at: string
     updated_at: string
   } | undefined
@@ -71,7 +68,9 @@ export async function getStudioFromSession(cookies: AstroCookies, request?: Requ
   if (!studioData) return null
 
   return {
-    ...studioData,
+    id: studioData.id,
+    name: studioData.name,
+    slug: studioData.slug,
     is_superadmin: !!superadmin,
     role: membership.role,
   }

@@ -3,9 +3,11 @@ import {
   BarChart3,
   LayoutDashboard,
   FileText,
-  Settings
+  Settings,
+  Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useSession } from '@/components/providers/SessionProvider'
 
 const navigation = [
   { name: 'Dashboard', href: '/studio', icon: LayoutDashboard },
@@ -15,7 +17,9 @@ const navigation = [
 ]
 
 export function StudioSidebar() {
+  const session = useSession()
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : ''
+  const isSuperAdmin = session.studio?.is_superadmin
 
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col">
@@ -53,6 +57,27 @@ export function StudioSidebar() {
           )
         })}
       </nav>
+
+      {/* Superadmin Link */}
+      {isSuperAdmin && (
+        <div className="px-3 pb-2">
+          <div className="border-t border-border pt-3 mb-2">
+            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
+              Superadmin
+            </p>
+          </div>
+          <a
+            href="/admin"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+              'text-muted-foreground hover:bg-muted hover:text-foreground'
+            )}
+          >
+            <Shield className="h-4 w-4" />
+            Panel SuperAdmin
+          </a>
+        </div>
+      )}
 
       {/* Footer */}
       <div className="p-3 border-t border-border">
