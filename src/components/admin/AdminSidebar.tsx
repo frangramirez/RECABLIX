@@ -26,7 +26,7 @@ const adminNavigation = [
 
 const myStudioNavigation = [
   { name: 'Mis Clientes', href: '/admin/my-studio/clients', icon: Users },
-  { name: 'Transacciones', href: '/admin/my-studio/transactions', icon: FileText },
+  { name: 'Operaciones', href: '/admin/my-studio/operations', icon: Receipt },
   { name: 'Recategorización', href: '/admin/my-studio/recategorization', icon: RefreshCw },
   { name: 'Reportes', href: '/admin/my-studio/reports', icon: FileBarChart },
 ]

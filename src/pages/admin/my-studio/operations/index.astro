@@ -1,0 +1,53 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { AdminOperationsManager } from '@/components/admin/AdminOperationsManager'
+import { createSupabaseServerClient, getStudioFromSession } from '@/lib/auth'
+import { supabaseAdmin } from '@/lib/supabase'
+
+// Obtener sesión completa (incluye impersonación via cookie)
+const session = await getStudioFromSession(Astro.cookies, Astro.request)
+
+let ownStudioId: string | null = null
+
+// Si está impersonando, el studio_id ya viene en session.studio
+// Si no, buscar el studio propio del superadmin
+if (session?.is_impersonating && session.studio) {
+  ownStudioId = session.studio.id
+} else if (session?.is_superadmin && supabaseAdmin) {
+  // Buscar studio donde el superadmin es miembro
+  const { data: membership } = await supabaseAdmin
+    .from('studio_members')
+    .select('studio_id')
+    .eq('user_id', session.user?.id)
+    .limit(1)
+    .single()
+
+  if (membership) {
+    ownStudioId = membership.studio_id
+  }
+}
+
+// Obtener período activo
+const supabase = createSupabaseServerClient(Astro.cookies)
+const { data: activePeriod } = await supabase
+  .from('reca_periods')
+  .select('sales_period_start, sales_period_end')
+  .eq('is_active', true)
+  .single()
+---
+
+<AdminLayout title="Operaciones">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">Operaciones</h1>
+        <p class="text-muted-foreground text-sm">Gestiona ventas y compras de todos los clientes</p>
+      </div>
+    </div>
+    <AdminOperationsManager
+      client:load
+      ownStudioId={ownStudioId}
+      activePeriod={activePeriod}
+    />
+  </div>
+</AdminLayout>

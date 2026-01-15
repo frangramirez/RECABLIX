@@ -1,0 +1,21 @@
+---
+import StudioLayout from '@/layouts/StudioLayout.astro'
+import { OperationsManager } from '@/components/studio/OperationsManager'
+import { createSupabaseServerClient } from '@/lib/auth'
+
+const supabase = createSupabaseServerClient(Astro.cookies)
+const { data: activePeriod } = await supabase
+  .from('reca_periods')
+  .select('sales_period_start, sales_period_end')
+  .eq('is_active', true)
+  .single()
+---
+
+<StudioLayout title="Operaciones">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-gray-900">Operaciones</h1>
+    </div>
+    <OperationsManager client:load activePeriod={activePeriod} />
+  </div>
+</StudioLayout>
