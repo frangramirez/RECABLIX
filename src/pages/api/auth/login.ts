@@ -1,8 +1,39 @@
 import type { APIRoute } from 'astro'
-import { createSupabaseServerClient } from '@/lib/auth'
+import { createServerClient, parseCookieHeader, serializeCookieHeader } from '@supabase/ssr'
 import { supabaseAdmin } from '@/lib/supabase'
 
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+
 export const POST: APIRoute = async ({ request, cookies }) => {
+  // Capturar cookies que Supabase setea durante login
+  const cookiesToSet: { name: string; value: string; options: Record<string, unknown> }[] = []
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        const cookieHeader = request.headers.get('cookie')
+        if (!cookieHeader) return []
+        return parseCookieHeader(cookieHeader).filter(
+          (c): c is { name: string; value: string } => typeof c.value === 'string'
+        )
+      },
+      setAll(cookies) {
+        // Capturar cookies para incluir en response
+        cookiesToSet.push(...cookies)
+        // También setear en Astro cookies (por si acaso)
+        for (const { name, value, options } of cookies) {
+          cookies.set(name, value, {
+            path: '/',
+            secure: import.meta.env.PROD,
+            sameSite: 'lax',
+            ...options,
+          } as Parameters<typeof cookies.set>[2])
+        }
+      },
+    },
+  })
+
   try {
     const { email, password } = await request.json()
 
@@ -13,15 +44,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       )
     }
 
-    const supabase = createSupabaseServerClient(cookies, request)
-
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
 
     if (error) {
-      // Capturar errores específicos
       if (error.message.includes('database error') || error.message.includes('querying schema')) {
         console.error('Database/Schema error during login:', error)
         return new Response(
@@ -77,16 +105,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Determinar redirect según rol
     const redirectTo = superadmin ? '/admin' : '/studio'
 
-    // Setear cookies de sesión manualmente en los headers de la Response
-    const session = data.session
-    const isProduction = import.meta.env.PROD
-    const cookieFlags = `Path=/; ${isProduction ? 'Secure; ' : ''}SameSite=Lax; HttpOnly; Max-Age=${60 * 60 * 24 * 7}`
-
-    // Headers permite múltiples Set-Cookie via append()
+    // Construir response con cookies que Supabase seteó
     const headers = new Headers()
     headers.set('Content-Type', 'application/json')
-    headers.append('Set-Cookie', `sb-access-token=${session.access_token}; ${cookieFlags}`)
-    headers.append('Set-Cookie', `sb-refresh-token=${session.refresh_token}; ${cookieFlags}`)
+
+    // Incluir todas las cookies que Supabase generó
+    for (const cookie of cookiesToSet) {
+      const serialized = serializeCookieHeader(cookie.name, cookie.value, {
+        path: '/',
+        secure: import.meta.env.PROD,
+        sameSite: 'lax',
+        httpOnly: true,
+        maxAge: 60 * 60 * 24 * 7, // 7 días
+        ...cookie.options,
+      })
+      headers.append('Set-Cookie', serialized)
+    }
 
     return new Response(JSON.stringify({ success: true, redirectTo }), {
       status: 200,
