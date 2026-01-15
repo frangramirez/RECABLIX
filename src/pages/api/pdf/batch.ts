@@ -56,7 +56,8 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
         reca_client_data (
           activity, province_code, works_in_rd, is_retired,
           dependents, local_m2, annual_rent, annual_mw,
-          previous_category, previous_fee
+          previous_category, previous_fee,
+          is_exempt, has_multilateral
         )
       `)
       .eq('id', clientId)
@@ -99,6 +100,18 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
     try {
       const result = await calculateRecategorization(supabase, period.id, clientData)
 
+      // Consultar si la provincia tiene IIBB integrado
+      const { data: ibpComponent } = await supabase
+        .from('reca_fee_components')
+        .select('has_integrated_iibb')
+        .eq('reca_id', period.id)
+        .eq('component_type', 'IBP')
+        .eq('province_code', reca.province_code || '901')
+        .limit(1)
+        .single()
+
+      const hasIntegratedIIBB = ibpComponent?.has_integrated_iibb || false
+
       const pdfBuffer = await renderToBuffer(
         ReportTemplate({
           client: {
@@ -111,6 +124,8 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
             localM2: reca.local_m2 || null,
             annualRent: reca.annual_rent || null,
             annualMW: reca.annual_mw || null,
+            isExempt: reca.is_exempt || false,
+            hasMultilateral: reca.has_multilateral || false,
           },
           result,
           scales,
@@ -119,6 +134,7 @@ export const POST: APIRoute = async ({ request, cookies, locals }) => {
           recaSemester: period.semester,
           studioName: studio.name,
           periodSales,
+          hasIntegratedIIBB,
         })
       )
 

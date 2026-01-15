@@ -36,9 +36,14 @@ if (studio?.is_superadmin && supabaseAdmin) {
     .single()
 
   if (membership?.studios) {
-    const studioInfo = membership.studios as { id: string; name: string }
-    superadminStudioId = studioInfo.id
-    superadminStudioName = studioInfo.name
+    // studios puede ser un array o un objeto dependiendo de la relación
+    const studioInfo = Array.isArray(membership.studios)
+      ? membership.studios[0]
+      : membership.studios
+    if (studioInfo) {
+      superadminStudioId = studioInfo.id
+      superadminStudioName = studioInfo.name
+    }
   }
 }
 ---

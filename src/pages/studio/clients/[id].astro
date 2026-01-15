@@ -25,7 +25,12 @@ const { data: client } = await supabase
       annual_rent,
       annual_mw,
       previous_category,
-      previous_fee
+      previous_fee,
+      is_exempt,
+      has_multilateral,
+      has_local,
+      rents_local,
+      lessor_cuit
     )
   `)
   .eq('id', id)
@@ -49,6 +54,11 @@ const flattenedClient = {
   annual_mw: reca.annual_mw,
   previous_category: reca.previous_category,
   previous_fee: reca.previous_fee,
+  is_exempt: reca.is_exempt || false,
+  has_multilateral: reca.has_multilateral || false,
+  has_local: reca.has_local || false,
+  rents_local: reca.rents_local || false,
+  lessor_cuit: reca.lessor_cuit || null,
 }
 ---
 

@@ -17,6 +17,8 @@ interface ClientInfo {
   localM2: number | null
   annualRent: number | null
   annualMW: number | null
+  isExempt: boolean
+  hasMultilateral: boolean
 }
 
 interface Props {
@@ -28,6 +30,7 @@ interface Props {
   recaSemester: number
   studioName: string
   periodSales: number
+  hasIntegratedIIBB: boolean
 }
 
 const formatARS = (n: number) =>
@@ -77,9 +80,16 @@ export function ReportTemplate({
   recaYear,
   recaSemester,
   studioName,
-  periodSales
+  periodSales,
+  hasIntegratedIIBB
 }: Props) {
   const currentCategory = result.category.finalCategory
+
+  // Determinar si mostrar leyenda provincial
+  const shouldShowProvincialLegend =
+    !hasIntegratedIIBB &&  // Provincia NO tiene IIBB integrado
+    !client.isExempt &&     // Cliente NO es exento
+    !client.hasMultilateral // Cliente NO está en convenio multilateral
 
   return (
     <Document>
@@ -243,6 +253,25 @@ export function ReportTemplate({
             Esta seccion mostrara deudas por periodo y estado de cuenta
           </Text>
         </View>
+
+        {/* Leyenda provincial (condicional) */}
+        {shouldShowProvincialLegend && (
+          <View style={{
+            marginTop: 16,
+            padding: 10,
+            backgroundColor: '#FEF3C7',
+            borderRadius: 4,
+            borderLeft: '3px solid #F59E0B'
+          }}>
+            <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#92400E', marginBottom: 4 }}>
+              NOTA IMPORTANTE - INGRESOS BRUTOS
+            </Text>
+            <Text style={{ fontSize: 8, color: '#92400E', lineHeight: 1.4 }}>
+              Ingresos Brutos se presenta por régimen general en esta jurisdicción.
+              El contribuyente debe inscribirse en el régimen local de IIBB de su provincia.
+            </Text>
+          </View>
+        )}
 
         {/* Footer */}
         <Text style={styles.footer}>

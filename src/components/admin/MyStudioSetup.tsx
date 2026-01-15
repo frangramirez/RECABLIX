@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -66,16 +65,18 @@ export function MyStudioSetup() {
   async function fetchStudios() {
     setIsLoadingStudios(true)
     try {
-      const { data, error } = await supabase
-        .from('studios')
-        .select('id, name, slug')
-        .order('name')
+      const response = await fetch('/api/admin/my-studio')
+      const data = await response.json()
 
-      if (error) throw error
-      setStudios(data || [])
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al cargar estudios')
+      }
+
+      setStudios(data.studios || [])
     } catch (error: unknown) {
       console.error('Error fetching studios:', error)
-      toast.error('Error al cargar estudios')
+      const errorMessage = error instanceof Error ? error.message : 'Error al cargar estudios'
+      toast.error(errorMessage)
     } finally {
       setIsLoadingStudios(false)
     }
@@ -96,38 +97,21 @@ export function MyStudioSetup() {
 
     setIsLoading(true)
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No hay sesión activa')
-
-      // Create studio
-      const { data: newStudio, error: studioError } = await supabase
-        .from('studios')
-        .insert({
+      const response = await fetch('/api/admin/my-studio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
           name: newStudioName.trim(),
           slug: newStudioSlug.trim(),
-        })
-        .select('id')
-        .single()
+        }),
+      })
 
-      if (studioError) {
-        if (studioError.code === '23505') {
-          toast.error('Ya existe un estudio con ese slug')
-          return
-        }
-        throw studioError
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al crear estudio')
       }
-
-      // Create membership as owner
-      const { error: memberError } = await supabase
-        .from('studio_members')
-        .insert({
-          studio_id: newStudio.id,
-          user_id: user.id,
-          role: 'owner',
-        })
-
-      if (memberError) throw memberError
 
       toast.success('Estudio creado correctamente')
       setIsCreateDialogOpen(false)
@@ -153,33 +137,20 @@ export function MyStudioSetup() {
 
     setIsLoading(true)
     try {
-      // Get current user
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) throw new Error('No hay sesión activa')
-
-      // Check if already a member
-      const { data: existingMember } = await supabase
-        .from('studio_members')
-        .select('id')
-        .eq('studio_id', selectedStudioId)
-        .eq('user_id', user.id)
-        .single()
-
-      if (existingMember) {
-        toast.error('Ya eres miembro de este estudio')
-        return
-      }
-
-      // Create membership as owner (superadmin gets owner role)
-      const { error: memberError } = await supabase
-        .from('studio_members')
-        .insert({
+      const response = await fetch('/api/admin/my-studio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'associate',
           studio_id: selectedStudioId,
-          user_id: user.id,
-          role: 'owner',
-        })
+        }),
+      })
 
-      if (memberError) throw memberError
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al asociarse al estudio')
+      }
 
       toast.success('Te has asociado al estudio correctamente')
       setIsAssociateDialogOpen(false)

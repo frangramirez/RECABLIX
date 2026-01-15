@@ -46,6 +46,7 @@ interface FeeComponent {
   value: number | null
   province_code: string | null
   has_municipal: boolean
+  has_integrated_iibb: boolean
 }
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
@@ -138,6 +139,7 @@ export function FeesManager({ periods }: Props) {
       value: null,
       province_code: null,
       has_municipal: false,
+      has_integrated_iibb: false,
     }
 
     switch (activeTab) {
@@ -695,6 +697,7 @@ export function FeesManager({ periods }: Props) {
                       </TableHead>
                     ))}
                     <TableHead className="text-center">Municipal</TableHead>
+                    <TableHead className="text-center">IIBB Integrado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -739,6 +742,25 @@ export function FeesManager({ periods }: Props) {
                               prev.map((c) =>
                                 c.component_code === prov.code
                                   ? { ...c, has_municipal: !!checked }
+                                  : c
+                              )
+                            )
+                          }}
+                        />
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Checkbox
+                          checked={
+                            components.find(
+                              (c) => c.component_code === prov.code && c.category === 'A'
+                            )?.has_integrated_iibb || false
+                          }
+                          onCheckedChange={(checked: boolean) => {
+                            // Aplicar a todas las categorías de la provincia
+                            setComponents((prev) =>
+                              prev.map((c) =>
+                                c.component_code === prov.code
+                                  ? { ...c, has_integrated_iibb: !!checked }
                                   : c
                               )
                             )

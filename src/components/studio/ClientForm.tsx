@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card'
 import { useToast } from '@/hooks/use-toast'
 import { Save, ArrowLeft } from 'lucide-react'
+import { validateCUIT, formatCUITInput } from '@/lib/validation/cuit'
 
 interface ClientData {
   id?: string
@@ -18,6 +19,14 @@ interface ClientData {
   works_in_rd: boolean
   is_retired: boolean
   dependents: number
+  // Nuevos campos tributarios
+  is_exempt: boolean
+  has_multilateral: boolean
+  // Nuevos campos de local
+  has_local: boolean
+  rents_local: boolean
+  lessor_cuit: string | null
+  // Parámetros físicos
   local_m2: number | null
   annual_rent: number | null
   annual_mw: number | null
@@ -56,6 +65,8 @@ const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
 export function ClientForm({ initialData, studioId }: Props) {
   const [loading, setLoading] = useState(false)
+  const [cuitError, setCuitError] = useState<string | null>(null)
+  const [lessorCuitError, setLessorCuitError] = useState<string | null>(null)
   const [formData, setFormData] = useState<ClientData>({
     name: initialData?.name || '',
     cuit: initialData?.cuit || null,
@@ -64,6 +75,11 @@ export function ClientForm({ initialData, studioId }: Props) {
     works_in_rd: initialData?.works_in_rd || false,
     is_retired: initialData?.is_retired || false,
     dependents: initialData?.dependents || 0,
+    is_exempt: initialData?.is_exempt || false,
+    has_multilateral: initialData?.has_multilateral || false,
+    has_local: initialData?.has_local || false,
+    rents_local: initialData?.rents_local || false,
+    lessor_cuit: initialData?.lessor_cuit || null,
     local_m2: initialData?.local_m2 || null,
     annual_rent: initialData?.annual_rent || null,
     annual_mw: initialData?.annual_mw || null,
@@ -74,6 +90,30 @@ export function ClientForm({ initialData, studioId }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validar CUIT antes de enviar
+    if (formData.cuit) {
+      const cuitValidation = validateCUIT(formData.cuit)
+      if (!cuitValidation.valid) {
+        toast({ variant: 'destructive', title: 'Error', description: cuitValidation.error })
+        return
+      }
+    }
+
+    // Validar CUIT del locador si alquila
+    if (formData.rents_local && !formData.lessor_cuit) {
+      toast({ variant: 'destructive', title: 'Error', description: 'CUIT del locador es obligatorio cuando alquilas el local' })
+      return
+    }
+
+    if (formData.rents_local && formData.lessor_cuit) {
+      const lessorCuitValidation = validateCUIT(formData.lessor_cuit)
+      if (!lessorCuitValidation.valid) {
+        toast({ variant: 'destructive', title: 'Error', description: `CUIT locador: ${lessorCuitValidation.error}` })
+        return
+      }
+    }
+
     setLoading(true)
 
     try {
@@ -98,6 +138,11 @@ export function ClientForm({ initialData, studioId }: Props) {
             works_in_rd: formData.works_in_rd,
             is_retired: formData.is_retired,
             dependents: formData.dependents,
+            is_exempt: formData.is_exempt,
+            has_multilateral: formData.has_multilateral,
+            has_local: formData.has_local,
+            rents_local: formData.rents_local,
+            lessor_cuit: formData.lessor_cuit?.trim() || null,
             local_m2: formData.local_m2,
             annual_rent: formData.annual_rent,
             annual_mw: formData.annual_mw,
@@ -133,6 +178,11 @@ export function ClientForm({ initialData, studioId }: Props) {
             works_in_rd: formData.works_in_rd,
             is_retired: formData.is_retired,
             dependents: formData.dependents,
+            is_exempt: formData.is_exempt,
+            has_multilateral: formData.has_multilateral,
+            has_local: formData.has_local,
+            rents_local: formData.rents_local,
+            lessor_cuit: formData.lessor_cuit?.trim() || null,
             local_m2: formData.local_m2,
             annual_rent: formData.annual_rent,
             annual_mw: formData.annual_mw,
@@ -178,9 +228,19 @@ export function ClientForm({ initialData, studioId }: Props) {
               <Input
                 id="cuit"
                 value={formData.cuit || ''}
-                onChange={(e) => updateField('cuit', e.target.value)}
+                onChange={(e) => {
+                  const formatted = formatCUITInput(e.target.value)
+                  updateField('cuit', formatted)
+                  const validation = validateCUIT(formatted)
+                  setCuitError(validation.error || null)
+                }}
                 placeholder="XX-XXXXXXXX-X"
+                maxLength={13}
+                className={cuitError ? 'border-destructive' : ''}
               />
+              {cuitError && (
+                <p className="text-xs text-destructive mt-1">{cuitError}</p>
+              )}
             </div>
             <div>
               <Label>Actividad Principal *</Label>
@@ -199,6 +259,31 @@ export function ClientForm({ initialData, studioId }: Props) {
                   {PROVINCES.map(p => <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Nuevos switches para exención y convenio multilateral */}
+            <div className="col-span-2 space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>¿Es exento de impuestos?</Label>
+                  <p className="text-xs text-gray-500">Cliente exento de ciertos impuestos provinciales</p>
+                </div>
+                <Switch
+                  checked={formData.is_exempt}
+                  onCheckedChange={(v) => updateField('is_exempt', v)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <Label>¿Inscripto en Convenio Multilateral?</Label>
+                  <p className="text-xs text-gray-500">Sujeto a CM para IIBB</p>
+                </div>
+                <Switch
+                  checked={formData.has_multilateral}
+                  onCheckedChange={(v) => updateField('has_multilateral', v)}
+                />
+              </div>
             </div>
           </div>
         </CardContent>
@@ -245,38 +330,115 @@ export function ClientForm({ initialData, studioId }: Props) {
 
       <Card>
         <CardContent className="pt-6 space-y-4">
-          <h3 className="font-semibold">Parámetros Físicos (opcionales)</h3>
+          <h3 className="font-semibold">Parámetros Físicos</h3>
 
-          <div className="grid grid-cols-3 gap-4">
+          {/* Switch: ¿Tiene local? */}
+          <div className="flex items-center justify-between">
             <div>
-              <Label htmlFor="local_m2">M² Local</Label>
-              <Input
-                id="local_m2"
-                type="number"
-                value={formData.local_m2 || ''}
-                onChange={(e) => updateField('local_m2', e.target.value ? parseInt(e.target.value) : null)}
-              />
+              <Label>¿Tenés local o establecimiento?</Label>
+              <p className="text-xs text-gray-500">Local comercial o establecimiento</p>
             </div>
-            <div>
-              <Label htmlFor="annual_rent">Alquiler Anual ($)</Label>
-              <Input
-                id="annual_rent"
-                type="number"
-                step="0.01"
-                value={formData.annual_rent || ''}
-                onChange={(e) => updateField('annual_rent', e.target.value ? parseFloat(e.target.value) : null)}
-              />
-            </div>
-            <div>
-              <Label htmlFor="annual_mw">MW Anual</Label>
-              <Input
-                id="annual_mw"
-                type="number"
-                value={formData.annual_mw || ''}
-                onChange={(e) => updateField('annual_mw', e.target.value ? parseInt(e.target.value) : null)}
-              />
-            </div>
+            <Switch
+              checked={formData.has_local}
+              onCheckedChange={(v) => {
+                updateField('has_local', v)
+                if (!v) {
+                  // Si desactiva, limpiar todos los campos relacionados
+                  updateField('local_m2', null)
+                  updateField('annual_mw', null)
+                  updateField('rents_local', false)
+                  updateField('annual_rent', null)
+                  updateField('lessor_cuit', null)
+                  setLessorCuitError(null)
+                }
+              }}
+            />
           </div>
+
+          {/* Campos condicionales si tiene local */}
+          {formData.has_local && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="local_m2">M² Local</Label>
+                  <Input
+                    id="local_m2"
+                    type="number"
+                    value={formData.local_m2 || ''}
+                    onChange={(e) => updateField('local_m2', e.target.value ? parseInt(e.target.value) : null)}
+                    placeholder="Ej: 50"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="annual_mw">MW Anual</Label>
+                  <Input
+                    id="annual_mw"
+                    type="number"
+                    value={formData.annual_mw || ''}
+                    onChange={(e) => updateField('annual_mw', e.target.value ? parseInt(e.target.value) : null)}
+                    placeholder="Ej: 5000"
+                  />
+                </div>
+              </div>
+
+              {/* Switch: ¿Alquila? */}
+              <div className="flex items-center justify-between pt-2">
+                <div>
+                  <Label>¿Lo alquilás?</Label>
+                  <p className="text-xs text-gray-500">Sos locatario del local</p>
+                </div>
+                <Switch
+                  checked={formData.rents_local}
+                  onCheckedChange={(v) => {
+                    updateField('rents_local', v)
+                    if (!v) {
+                      updateField('annual_rent', null)
+                      updateField('lessor_cuit', null)
+                      setLessorCuitError(null)
+                    }
+                  }}
+                />
+              </div>
+
+              {/* Campos condicionales si alquila */}
+              {formData.rents_local && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="annual_rent">Alquiler Anual ($) *</Label>
+                    <Input
+                      id="annual_rent"
+                      type="number"
+                      step="0.01"
+                      value={formData.annual_rent || ''}
+                      onChange={(e) => updateField('annual_rent', e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="Ej: 1200000"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="lessor_cuit">CUIT Locador *</Label>
+                    <Input
+                      id="lessor_cuit"
+                      value={formData.lessor_cuit || ''}
+                      onChange={(e) => {
+                        const formatted = formatCUITInput(e.target.value)
+                        updateField('lessor_cuit', formatted)
+                        const validation = validateCUIT(formatted)
+                        setLessorCuitError(validation.error || null)
+                      }}
+                      placeholder="XX-XXXXXXXX-X"
+                      maxLength={13}
+                      className={lessorCuitError ? 'border-destructive' : ''}
+                      required
+                    />
+                    {lessorCuitError && (
+                      <p className="text-xs text-destructive mt-1">{lessorCuitError}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </CardContent>
       </Card>
 

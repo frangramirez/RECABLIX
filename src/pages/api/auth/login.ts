@@ -21,6 +21,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     })
 
     if (error) {
+      // Capturar errores específicos
+      if (error.message.includes('database error') || error.message.includes('querying schema')) {
+        console.error('Database/Schema error during login:', error)
+        return new Response(
+          JSON.stringify({ error: 'Error de configuración de base de datos. Contacta al administrador.' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      if (error.message.includes('Invalid login credentials')) {
+        return new Response(
+          JSON.stringify({ error: 'Email o contraseña incorrectos' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
       return new Response(JSON.stringify({ error: error.message }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },

@@ -3,10 +3,7 @@ import AdminLayout from '@/layouts/AdminLayout.astro'
 import { MyStudioSetup } from '@/components/admin/MyStudioSetup'
 
 // Si ya tiene estudio, redirigir a clients
-const studio = Astro.locals.studio
-if (studio?.studio_id) {
-  return Astro.redirect('/admin/my-studio/clients')
-}
+// La sesión tiene 'id' del usuario, no 'studio_id' - verificamos si hay membresía via API
 ---
 
 <AdminLayout title="Configurar Mi Estudio">
