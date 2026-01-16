@@ -11,6 +11,7 @@
 import type { APIRoute } from 'astro'
 import { getStudioFromSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import type { SubscriptionLimits } from '@/types/subscription'
 
 export const GET: APIRoute = async ({ url, cookies, request }) => {
   try {
@@ -19,6 +20,13 @@ export const GET: APIRoute = async ({ url, cookies, request }) => {
     if (!session) {
       return new Response(JSON.stringify({ error: 'No autenticado' }), {
         status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!supabaseAdmin) {
+      return new Response(JSON.stringify({ error: 'Service key no configurada' }), {
+        status: 500,
         headers: { 'Content-Type': 'application/json' },
       })
     }
@@ -106,6 +114,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     if (!session) {
       return new Response(JSON.stringify({ error: 'No autenticado' }), {
         status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }
+
+    if (!supabaseAdmin) {
+      return new Response(JSON.stringify({ error: 'Service key no configurada' }), {
+        status: 500,
         headers: { 'Content-Type': 'application/json' },
       })
     }
@@ -207,6 +222,83 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         }),
         {
           status: 409, // Conflict
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    // Verificar límites de subscripción antes de agregar
+    const { data: studio, error: studioError } = await supabaseAdmin
+      .from('studios')
+      .select('subscription_limits')
+      .eq('id', studio_id)
+      .single()
+
+    if (studioError) {
+      console.error('Error fetching studio limits:', studioError)
+      return new Response(
+        JSON.stringify({ error: 'Error al verificar límites del studio' }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
+
+    const limits: SubscriptionLimits = studio.subscription_limits || {
+      max_admins: null,
+      max_collaborators: null,
+      max_clients: null,
+    }
+
+    // Contar miembros actuales por rol solo si hay límite configurado
+    let currentCount = 0
+    let limitReached = false
+    let limitMessage = ''
+
+    if (role === 'admin' && limits.max_admins !== null) {
+      const { count } = await supabaseAdmin
+        .from('studio_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('studio_id', studio_id)
+        .eq('role', 'admin')
+
+      currentCount = count || 0
+      if (currentCount >= limits.max_admins) {
+        limitReached = true
+        limitMessage = `Límite de admins alcanzado: ${currentCount}/${limits.max_admins}`
+      }
+    } else if (role === 'collaborator' && limits.max_collaborators !== null) {
+      const { count } = await supabaseAdmin
+        .from('studio_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('studio_id', studio_id)
+        .eq('role', 'collaborator')
+
+      currentCount = count || 0
+      if (currentCount >= limits.max_collaborators) {
+        limitReached = true
+        limitMessage = `Límite de collaborators alcanzado: ${currentCount}/${limits.max_collaborators}`
+      }
+    } else if (role === 'client' && limits.max_clients !== null) {
+      const { count } = await supabaseAdmin
+        .from('studio_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('studio_id', studio_id)
+        .eq('role', 'client')
+
+      currentCount = count || 0
+      if (currentCount >= limits.max_clients) {
+        limitReached = true
+        limitMessage = `Límite de clients alcanzado: ${currentCount}/${limits.max_clients}`
+      }
+    }
+
+    if (limitReached) {
+      return new Response(
+        JSON.stringify({ error: limitMessage }),
+        {
+          status: 403, // Forbidden
           headers: { 'Content-Type': 'application/json' },
         }
       )

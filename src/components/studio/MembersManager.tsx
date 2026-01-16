@@ -35,8 +35,9 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Pencil, Trash2, Shield, UserPlus, Loader2 } from 'lucide-react'
+import { Pencil, Trash2, Shield, UserPlus, Loader2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
+import type { SubscriptionLimits, SubscriptionUsage } from '@/types/subscription'
 
 interface Member {
   id: string
@@ -101,7 +102,17 @@ const PERMISSION_CONFIGS: PermissionConfig[] = [
   },
 ]
 
-export function MembersManager() {
+interface MembersManagerProps {
+  subscriptionLimits?: SubscriptionLimits | null
+  subscriptionUsage?: SubscriptionUsage | null
+  showLimits?: boolean
+}
+
+export function MembersManager({
+  subscriptionLimits = null,
+  subscriptionUsage = null,
+  showLimits = false,
+}: MembersManagerProps) {
   const { studio, role, is_superadmin, permissions } = useStore($session)
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
@@ -116,6 +127,40 @@ export function MembersManager() {
   const [inviting, setInviting] = useState(false)
 
   const canManageMembers = is_superadmin || role === 'owner' || role === 'admin'
+
+  // Verificar si se alcanzó el límite para un rol específico
+  const isLimitReached = (checkRole: 'admin' | 'collaborator' | 'client'): boolean => {
+    if (!subscriptionLimits || !subscriptionUsage) return false
+
+    const roleMap = {
+      admin: { limit: subscriptionLimits.max_admins, usage: subscriptionUsage.admins },
+      collaborator: {
+        limit: subscriptionLimits.max_collaborators,
+        usage: subscriptionUsage.collaborators,
+      },
+      client: { limit: subscriptionLimits.max_clients, usage: subscriptionUsage.clients },
+    }
+
+    const { limit, usage } = roleMap[checkRole]
+    return limit !== null && usage >= limit
+  }
+
+  // Obtener mensaje de límite alcanzado
+  const getLimitMessage = (checkRole: 'admin' | 'collaborator' | 'client'): string => {
+    if (!subscriptionLimits || !subscriptionUsage) return ''
+
+    const roleMap = {
+      admin: { limit: subscriptionLimits.max_admins, usage: subscriptionUsage.admins },
+      collaborator: {
+        limit: subscriptionLimits.max_collaborators,
+        usage: subscriptionUsage.collaborators,
+      },
+      client: { limit: subscriptionLimits.max_clients, usage: subscriptionUsage.clients },
+    }
+
+    const { limit, usage } = roleMap[checkRole]
+    return limit !== null ? `${usage}/${limit}` : `${usage}/∞`
+  }
 
   useEffect(() => {
     fetchMembers()
@@ -327,7 +372,15 @@ export function MembersManager() {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Miembros del Studio</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Miembros del Studio</h2>
+          {showLimits && subscriptionUsage && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Admins: {getLimitMessage('admin')} | Collaborators: {getLimitMessage('collaborator')} |
+              Clients: {getLimitMessage('client')}
+            </p>
+          )}
+        </div>
         {(is_superadmin || role === 'owner') && (
           <Button onClick={openInviteDialog}>
             <UserPlus className="h-4 w-4 mr-2" />
@@ -517,6 +570,27 @@ export function MembersManager() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+
+              {/* Advertencia de límite alcanzado */}
+              {showLimits && isLimitReached(inviteRole) && (
+                <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                  <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-medium text-amber-900">Límite alcanzado</p>
+                    <p className="text-amber-700">
+                      Ya alcanzaste el límite de {inviteRole}s ({getLimitMessage(inviteRole)}). No
+                      podrás invitar más usuarios con este rol.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Indicador de uso actual */}
+              {showLimits && !isLimitReached(inviteRole) && subscriptionUsage && (
+                <p className="text-xs text-muted-foreground">
+                  Uso actual: {getLimitMessage(inviteRole)}
+                </p>
+              )}
             </div>
           </div>
 
