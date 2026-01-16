@@ -39,6 +39,8 @@ interface ClientData {
 interface Props {
   initialData?: ClientData
   studioId: string
+  schemaName?: string
+  returnUrl?: string
 }
 
 const ACTIVITIES = [
@@ -65,16 +67,18 @@ const PROVINCES = [
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
-export function ClientForm({ initialData, studioId }: Props) {
+export function ClientForm({ initialData, studioId, schemaName, returnUrl = '/studio/clients' }: Props) {
   const [loading, setLoading] = useState(false)
   const [cuitError, setCuitError] = useState<string | null>(null)
   const [lessorCuitError, setLessorCuitError] = useState<string | null>(null)
 
-  // Tenant queries
+  // Tenant queries - usar props si están disponibles, sino session
   const session = useSession()
-  const tenantContext = session.studio
-    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
-    : null
+  const tenantContext = schemaName
+    ? { studioId, schemaName }
+    : session.studio
+      ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+      : null
   const { query } = useTenantSupabase(tenantContext)
 
   const [formData, setFormData] = useState<ClientData>({
@@ -215,7 +219,7 @@ export function ClientForm({ initialData, studioId }: Props) {
         toast({ title: 'Creado', description: 'Cliente creado correctamente' })
       }
 
-      window.location.href = '/studio/clients'
+      window.location.href = returnUrl
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message })
     } finally {
@@ -505,7 +509,7 @@ export function ClientForm({ initialData, studioId }: Props) {
 
       <div className="flex gap-4">
         <Button type="button" variant="outline" asChild>
-          <a href="/studio/clients"><ArrowLeft className="h-4 w-4 mr-2" />Volver</a>
+          <a href={returnUrl}><ArrowLeft className="h-4 w-4 mr-2" />Volver</a>
         </Button>
         <Button type="submit" disabled={loading}>
           <Save className="h-4 w-4 mr-2" />{loading ? 'Guardando...' : 'Guardar'}
