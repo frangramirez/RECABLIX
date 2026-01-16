@@ -35,26 +35,35 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const body = await request.json()
     const components: FeeComponentInput[] = body.components
 
-    if (!components || !Array.isArray(components) || components.length === 0) {
+    if (!components || !Array.isArray(components)) {
       return new Response(
         JSON.stringify({ error: 'Datos de componentes inválidos' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // Mapear componentes, NUNCA incluir id (dejar que la BD lo genere/maneje con ON CONFLICT)
-    // El upsert usa ON CONFLICT en (reca_id, component_code, category), no necesita el id
-    const recordsToUpsert = components.map((c) => ({
-      reca_id: c.reca_id,
-      component_code: c.component_code,
-      description: c.description,
-      component_type: c.component_type,
-      category: c.category,
-      value: c.value,
-      province_code: c.province_code,
-      has_municipal: c.has_municipal,
-      has_integrated_iibb: c.has_integrated_iibb,
-    }))
+    // Filtrar solo componentes con valor válido (validación defensiva)
+    // La BD tiene NOT NULL constraint en value
+    const recordsToUpsert = components
+      .filter((c) => c.value !== null && c.value !== undefined)
+      .map((c) => ({
+        reca_id: c.reca_id,
+        component_code: c.component_code,
+        description: c.description,
+        component_type: c.component_type,
+        category: c.category,
+        value: c.value,
+        province_code: c.province_code,
+        has_municipal: c.has_municipal,
+        has_integrated_iibb: c.has_integrated_iibb,
+      }))
+
+    if (recordsToUpsert.length === 0) {
+      return new Response(
+        JSON.stringify({ success: true, message: 'No hay componentes con valores para guardar', components: [] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
     const { data, error } = await supabaseAdmin
       .from('reca_fee_components')

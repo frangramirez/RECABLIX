@@ -198,22 +198,33 @@ export function FeesManager({ periods }: Props) {
 
     setIsSaving(true)
     try {
+      // Filtrar solo componentes con valor válido (no null, no NaN)
+      // La BD tiene NOT NULL constraint en value
+      const componentsWithValues = components
+        .filter((c) => c.value !== null && !isNaN(c.value))
+        .map((c) => ({
+          reca_id: selectedPeriodId,
+          component_code: c.component_code,
+          description: c.description,
+          component_type: 'IBP',
+          category: c.category,
+          value: c.value,
+          province_code: c.province_code,
+          has_municipal: c.has_municipal,
+          has_integrated_iibb: c.has_integrated_iibb,
+        }))
+
+      if (componentsWithValues.length === 0) {
+        toast.info('No hay componentes con valores para guardar')
+        setIsSaving(false)
+        return
+      }
+
       const response = await fetch('/api/admin/fees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // No enviar id - el upsert usa ON CONFLICT (reca_id, component_code, category)
-          components: components.map((c) => ({
-            reca_id: selectedPeriodId,
-            component_code: c.component_code,
-            description: c.description,
-            component_type: 'IBP',
-            category: c.category,
-            value: c.value,
-            province_code: c.province_code,
-            has_municipal: c.has_municipal,
-            has_integrated_iibb: c.has_integrated_iibb,
-          })),
+          components: componentsWithValues,
         }),
       })
 
@@ -221,7 +232,7 @@ export function FeesManager({ periods }: Props) {
       if (!response.ok) throw new Error(result.error || 'Error al guardar')
 
       const tabName = activeTab === 'IBP' ? 'Provincial' : 'Municipal'
-      toast.success(`Componentes ${tabName} guardados correctamente`)
+      toast.success(`${componentsWithValues.length} componentes ${tabName} guardados`)
       fetchComponents() // Reload
     } catch (error: any) {
       console.error('Error saving components:', error)
