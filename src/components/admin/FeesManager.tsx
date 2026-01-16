@@ -120,10 +120,20 @@ export function FeesManager({ periods }: Props) {
 
       if (error) throw error
 
+      // Siempre crear plantilla completa y mergear con datos existentes
+      const emptyComponents = createEmptyComponents()
+
       if (!data || data.length === 0) {
-        setComponents(createEmptyComponents())
+        setComponents(emptyComponents)
       } else {
-        setComponents(data)
+        // Merge: usar datos existentes donde existan, plantilla vacía donde no
+        const merged = emptyComponents.map((empty) => {
+          const existing = data.find(
+            (d: FeeComponent) => d.component_code === empty.component_code && d.category === empty.category
+          )
+          return existing || empty
+        })
+        setComponents(merged)
       }
     } catch (error: any) {
       console.error('Error fetching components:', error)
