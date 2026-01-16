@@ -42,34 +42,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       )
     }
 
-<<<<<<< Updated upstream
-    const { data, error } = await supabaseAdmin.from('reca_fee_components').upsert(
-      components.map((c) => {
-        // Solo incluir id si existe (evita null constraint violation)
-        const record: Record<string, unknown> = {
-          reca_id: c.reca_id,
-          component_code: c.component_code,
-          description: c.description,
-          component_type: c.component_type,
-          category: c.category,
-          value: c.value,
-          province_code: c.province_code,
-          has_municipal: c.has_municipal,
-          has_integrated_iibb: c.has_integrated_iibb,
-        }
-        // Solo incluir id si es un UUID válido (no undefined, null, o string vacío)
-        if (c.id && typeof c.id === 'string' && c.id.length > 0) {
-          record.id = c.id
-        }
-        return record
-      }),
-      {
-        onConflict: 'reca_id,component_code,category',
-=======
-    // Filtrar componentes que tienen id undefined/null para evitar constraint violation
+    // Mapear componentes, solo incluyendo id si existe
     const recordsToUpsert = components.map((c) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const record: any = {
+      const record: Record<string, unknown> = {
         reca_id: c.reca_id,
         component_code: c.component_code,
         description: c.description,
@@ -79,9 +54,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         province_code: c.province_code,
         has_municipal: c.has_municipal,
         has_integrated_iibb: c.has_integrated_iibb,
->>>>>>> Stashed changes
       }
-      // Solo agregar id si existe y es válido
+      // Solo agregar id si existe y es válido (evita null constraint violation)
       if (c.id && c.id.length > 0) {
         record.id = c.id
       }

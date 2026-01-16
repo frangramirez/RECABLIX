@@ -122,22 +122,14 @@ export function FeesManager({ periods }: Props) {
 
       // Siempre crear plantilla completa y mergear con datos existentes
       const emptyComponents = createEmptyComponents()
-<<<<<<< Updated upstream
-
-=======
->>>>>>> Stashed changes
       if (!data || data.length === 0) {
         setComponents(emptyComponents)
       } else {
         // Merge: usar datos existentes donde existan, plantilla vacía donde no
         const merged = emptyComponents.map((empty) => {
           const existing = data.find(
-<<<<<<< Updated upstream
-            (d: FeeComponent) => d.component_code === empty.component_code && d.category === empty.category
-=======
             (d: FeeComponent) =>
               d.component_code === empty.component_code && d.category === empty.category
->>>>>>> Stashed changes
           )
           return existing || empty
         })
@@ -211,12 +203,7 @@ export function FeesManager({ periods }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           components: components.map((c) => {
-<<<<<<< Updated upstream
             const comp: Record<string, unknown> = {
-=======
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const comp: any = {
->>>>>>> Stashed changes
               reca_id: selectedPeriodId,
               component_code: c.component_code,
               description: c.description,
@@ -227,11 +214,7 @@ export function FeesManager({ periods }: Props) {
               has_municipal: c.has_municipal,
               has_integrated_iibb: c.has_integrated_iibb,
             }
-<<<<<<< Updated upstream
-            // Solo incluir id si existe (evita null constraint en el upsert)
-=======
             // Solo incluir id si existe (evita null constraint)
->>>>>>> Stashed changes
             if (c.id) comp.id = c.id
             return comp
           }),
