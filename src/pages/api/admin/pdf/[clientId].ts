@@ -9,6 +9,12 @@ import {
 } from '@/lib/calculations'
 import { ReportTemplate } from '@/lib/pdf/ReportTemplate'
 
+// Configuración de función serverless para Vercel
+// @react-pdf/renderer necesita más tiempo y memoria que el default
+export const config = {
+  maxDuration: 30, // 30 segundos (máximo en Pro)
+}
+
 /**
  * API endpoint para generar PDF de recategorización desde panel Superadmin
  * Permite acceder a cualquier cliente del sistema (no restringido por studio)
@@ -124,43 +130,52 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
 
   const hasIntegratedIIBB = ibpComponent?.has_integrated_iibb || false
 
-  // Generar PDF
-  const pdfBuffer = await renderToBuffer(
-    ReportTemplate({
-      client: {
-        name: clientWithData.name,
-        cuit: clientWithData.cuit,
-        activity: (reca.activity as string) || 'SERVICIOS',
-        provinceCode: (reca.province_code as string) || '901',
-        worksInRD: (reca.works_in_rd as boolean) || false,
-        isRetired: (reca.is_retired as boolean) || false,
-        localM2: (reca.local_m2 as number) || null,
-        annualRent: (reca.annual_rent as number) || null,
-        annualMW: (reca.annual_mw as number) || null,
-        isExempt: (reca.is_exempt as boolean) || false,
-        hasMultilateral: (reca.has_multilateral as boolean) || false,
+  // Generar PDF con manejo de errores
+  try {
+    const pdfBuffer = await renderToBuffer(
+      ReportTemplate({
+        client: {
+          name: clientWithData.name,
+          cuit: clientWithData.cuit,
+          activity: (reca.activity as string) || 'SERVICIOS',
+          provinceCode: (reca.province_code as string) || '901',
+          worksInRD: (reca.works_in_rd as boolean) || false,
+          isRetired: (reca.is_retired as boolean) || false,
+          localM2: (reca.local_m2 as number) || null,
+          annualRent: (reca.annual_rent as number) || null,
+          annualMW: (reca.annual_mw as number) || null,
+          isExempt: (reca.is_exempt as boolean) || false,
+          hasMultilateral: (reca.has_multilateral as boolean) || false,
+        },
+        result,
+        scales,
+        recaCode: period.code,
+        recaYear: period.year,
+        recaSemester: period.semester,
+        studioName,
+        periodSales,
+        hasIntegratedIIBB,
+      })
+    )
+
+    const filename = `${clientWithData.name.replace(/\s+/g, '-')}-RECA-${period.code}.pdf`
+
+    // Determinar si es descarga o vista inline
+    const download = url.searchParams.get('download') === '1'
+    const disposition = download ? 'attachment' : 'inline'
+
+    return new Response(new Uint8Array(pdfBuffer), {
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `${disposition}; filename="${filename}"`,
       },
-      result,
-      scales,
-      recaCode: period.code,
-      recaYear: period.year,
-      recaSemester: period.semester,
-      studioName,
-      periodSales,
-      hasIntegratedIIBB,
     })
-  )
-
-  const filename = `${clientWithData.name.replace(/\s+/g, '-')}-RECA-${period.code}.pdf`
-
-  // Determinar si es descarga o vista inline
-  const download = url.searchParams.get('download') === '1'
-  const disposition = download ? 'attachment' : 'inline'
-
-  return new Response(new Uint8Array(pdfBuffer), {
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `${disposition}; filename="${filename}"`,
-    },
-  })
+  } catch (error) {
+    console.error('Error generando PDF:', error)
+    const message = error instanceof Error ? error.message : 'Error desconocido'
+    return new Response(JSON.stringify({ error: 'Error generando PDF', details: message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 }
