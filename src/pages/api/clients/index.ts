@@ -22,8 +22,8 @@ interface ClientInput {
   is_exempt: boolean
   has_multilateral: boolean
   has_local: boolean
-  rents_local: boolean
-  lessor_cuit: string | null
+  is_rented: boolean
+  landlord_cuit: string | null
   local_m2: number | null
   annual_rent: number | null
   annual_mw: number | null
@@ -130,8 +130,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       is_exempt: input.is_exempt,
       has_multilateral: input.has_multilateral,
       has_local: input.has_local,
-      rents_local: input.rents_local,
-      lessor_cuit: input.lessor_cuit?.trim() || null,
+      is_rented: input.is_rented,
+      landlord_cuit: input.landlord_cuit?.trim() || null,
       local_m2: input.local_m2,
       annual_rent: input.annual_rent,
       annual_mw: input.annual_mw,
