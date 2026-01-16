@@ -80,14 +80,18 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         .eq('id', studioId)
         .single()
 
+      // Generar el nombre del schema esperado
+      const expectedSchema = `tenant_${studioId.replace(/-/g, '_')}`
+
       if (studioRecord?.schema_name) {
         tenantSchema = studioRecord.schema_name
       } else {
-        // Si no tiene schema, crear el tenant schema automáticamente
-        const { data: createResult, error: createError } = await supabaseAdmin
+        // Intentar crear el tenant schema (ignorar si ya existe)
+        const { error: createError } = await supabaseAdmin
           .rpc('create_reca_tenant', { p_studio_id: studioId })
 
-        if (createError) {
+        // Ignorar errores de "already exists" - significa que el schema ya fue creado
+        if (createError && !createError.message.includes('already exists')) {
           console.error('Error creando tenant schema:', createError)
           return new Response(
             JSON.stringify({ error: 'Error al crear tenant schema: ' + createError.message }),
@@ -95,8 +99,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           )
         }
 
-        // El schema se creó, obtener el nombre
-        tenantSchema = `tenant_${studioId.replace(/-/g, '_')}`
+        tenantSchema = expectedSchema
 
         // Actualizar el schema_name en la BD
         await supabaseAdmin
