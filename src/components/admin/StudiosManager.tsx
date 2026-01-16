@@ -155,22 +155,29 @@ export function StudiosManager() {
     }
 
     try {
-      const { error } = await supabase.from('studios').insert({
-        name: formData.name,
-        slug: formData.slug,
+      // Usar endpoint API que crea studio + membership como owner
+      const response = await fetch('/api/admin/my-studio', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create',
+          name: formData.name,
+          slug: formData.slug,
+        }),
       })
 
-      if (error) throw error
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al crear estudio')
+      }
+
       toast.success('Estudio creado correctamente')
       setIsDialogOpen(false)
       fetchStudios()
     } catch (error: any) {
       console.error('Error creating studio:', error)
-      if (error.code === '23505') {
-        toast.error('Ya existe un estudio con ese slug')
-      } else {
-        toast.error(error.message || 'Error al crear estudio')
-      }
+      toast.error(error.message || 'Error al crear estudio')
     }
   }
 
