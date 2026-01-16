@@ -524,7 +524,7 @@ export function FeesManager({ periods }: Props) {
                               c.component_code === prov.code && c.category === cat
                           )
                           return (
-                            <TableCell key={cat} className="px-1 py-1">
+                            <TableCell key={cat} className="px-0.5 py-1 text-center">
                               <Input
                                 type="text"
                                 inputMode="decimal"
@@ -534,19 +534,17 @@ export function FeesManager({ periods }: Props) {
                                   updateComponent(prov.code, cat, 'value', parsed)
                                 }}
                                 onFocus={(e) => {
-                                  // Al enfocar, mostrar valor sin formato para edición
                                   if (comp?.value !== null && comp?.value !== undefined) {
                                     e.target.value = String(comp.value)
                                   }
                                 }}
                                 onBlur={(e) => {
-                                  // Al salir, reformatear el valor
                                   const parsed = parseFormattedNumber(e.target.value)
                                   updateComponent(prov.code, cat, 'value', parsed)
                                 }}
                                 placeholder="0,00"
                                 className={cn(
-                                  'w-28 text-right tabular-nums',
+                                  'w-24 text-right tabular-nums mx-auto',
                                   !hasIntegrated && 'cursor-not-allowed'
                                 )}
                                 disabled={!hasIntegrated}
@@ -601,7 +599,7 @@ export function FeesManager({ periods }: Props) {
                               c.component_code === `${prov.code}M` && c.category === cat
                           )
                           return (
-                            <TableCell key={cat} className="px-1 py-1">
+                            <TableCell key={cat} className="px-0.5 py-1 text-center">
                               <Input
                                 type="text"
                                 inputMode="decimal"
@@ -621,7 +619,7 @@ export function FeesManager({ periods }: Props) {
                                 }}
                                 placeholder="0,00"
                                 className={cn(
-                                  'w-28 text-right tabular-nums',
+                                  'w-24 text-right tabular-nums mx-auto',
                                   !hasMunicipal && 'cursor-not-allowed'
                                 )}
                                 disabled={!hasMunicipal}
