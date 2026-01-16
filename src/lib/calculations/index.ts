@@ -44,6 +44,10 @@ export interface ClientData {
   periodSales: number
   previousCategory: string | null
   previousFee: number | null
+  /** Cliente exento de IIBB (Provincia = "EX") */
+  isExempt?: boolean
+  /** Cliente con Convenio Multilateral (Provincia = "CM") */
+  hasMultilateral?: boolean
 }
 
 export interface RecategorizationResult {
@@ -89,6 +93,8 @@ export function calculateRecategorizationFromData(
     worksInRD: client.worksInRD,
     isRetired: client.isRetired,
     dependents: client.dependents,
+    isExempt: client.isExempt,
+    hasMultilateral: client.hasMultilateral,
   })
 
   // 3. Sumar total

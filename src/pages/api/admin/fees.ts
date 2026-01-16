@@ -12,6 +12,7 @@ interface FeeComponentInput {
   value: number | null
   province_code: string | null
   has_municipal: boolean
+  has_integrated_iibb: boolean
 }
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -42,17 +43,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     const { data, error } = await supabaseAdmin.from('reca_fee_components').upsert(
-      components.map((c) => ({
-        id: c.id,
-        reca_id: c.reca_id,
-        component_code: c.component_code,
-        description: c.description,
-        component_type: c.component_type,
-        category: c.category,
-        value: c.value,
-        province_code: c.province_code,
-        has_municipal: c.has_municipal,
-      })),
+      components.map((c) => {
+        // Solo incluir id si existe (evita null constraint violation)
+        const record: Record<string, unknown> = {
+          reca_id: c.reca_id,
+          component_code: c.component_code,
+          description: c.description,
+          component_type: c.component_type,
+          category: c.category,
+          value: c.value,
+          province_code: c.province_code,
+          has_municipal: c.has_municipal,
+          has_integrated_iibb: c.has_integrated_iibb,
+        }
+        if (c.id) record.id = c.id
+        return record
+      }),
       {
         onConflict: 'reca_id,component_code,category',
       }

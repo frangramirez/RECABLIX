@@ -1,0 +1,79 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { supabaseAdmin } from '@/lib/supabase'
+import { getTenantSchemaName } from '@/lib/config'
+import { ClientImporterWithStudio } from '@/components/admin/ClientImporterWithStudio'
+
+// Verificar que es superadmin
+const studio = Astro.locals.studio
+if (!studio?.is_superadmin) {
+  return Astro.redirect('/studio')
+}
+
+const { studioId } = Astro.params
+
+if (!studioId) {
+  return Astro.redirect('/admin/my-studios')
+}
+
+// Obtener datos del estudio y verificar acceso
+let studioData = null
+
+if (supabaseAdmin) {
+  // Verificar que el usuario es miembro de este estudio
+  const { data: membership } = await supabaseAdmin
+    .from('studio_members')
+    .select('role')
+    .eq('studio_id', studioId)
+    .eq('user_id', studio.user_id)
+    .single()
+
+  if (!membership || !['owner', 'admin'].includes(membership.role)) {
+    return Astro.redirect('/admin/my-studios')
+  }
+
+  // Obtener datos del estudio
+  const { data: studioRecord } = await supabaseAdmin
+    .from('studios')
+    .select('id, name, slug')
+    .eq('id', studioId)
+    .single()
+
+  if (studioRecord) {
+    studioData = {
+      ...studioRecord,
+      schema_name: getTenantSchemaName(studioRecord.id)
+    }
+  }
+}
+
+if (!studioData) {
+  return Astro.redirect('/admin/my-studios')
+}
+---
+
+<AdminLayout title={`Importar Clientes - ${studioData.name}`}>
+  <div class="space-y-6">
+    <div>
+      <div class="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+        <a href="/admin/my-studios" class="hover:underline">Mis Estudios</a>
+        <span>/</span>
+        <a href={`/admin/my-studios/${studioId}`} class="hover:underline">{studioData.name}</a>
+        <span>/</span>
+        <a href={`/admin/my-studios/${studioId}/clients`} class="hover:underline">Clientes</a>
+        <span>/</span>
+        <span>Importar</span>
+      </div>
+      <h1 class="text-2xl font-bold">Importar Clientes</h1>
+      <p class="text-muted-foreground text-sm">
+        Importar clientes desde Excel para <span class="font-medium">{studioData.name}</span>
+      </p>
+    </div>
+
+    <ClientImporterWithStudio
+      client:load
+      studioId={studioData.id}
+      schemaName={studioData.schema_name}
+    />
+  </div>
+</AdminLayout>

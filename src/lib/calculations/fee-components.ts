@@ -23,6 +23,10 @@ export interface FeeInput {
   worksInRD: boolean
   isRetired: boolean
   dependents: number
+  /** Cliente exento de IIBB (Provincia = "EX") */
+  isExempt?: boolean
+  /** Cliente con Convenio Multilateral (Provincia = "CM") */
+  hasMultilateral?: boolean
 }
 
 export interface FeeComponentData {
@@ -203,40 +207,66 @@ export function calculateFeeComponentsFromData(
   // ────────────────────────────────────────────────────────────
   // 4. COMPONENTE PROVINCIAL (IIBB - IBP)
   // ────────────────────────────────────────────────────────────
-  const provComponent = allComponents.find(
-    c => c.component_type === 'IBP' &&
-         c.province_code === input.provinceCode &&
-         c.category === input.category
-  )
 
-  if (provComponent) {
-    subtotals.provincial = Number(provComponent.value)
+  // Detectar EX/CM desde provinceCode o flags explícitos
+  const isExempt = input.isExempt || input.provinceCode === 'EX'
+  const hasMultilateral = input.hasMultilateral || input.provinceCode === 'CM'
+
+  // Si es exento o tiene convenio multilateral, no paga IIBB provincial
+  if (isExempt) {
     components.push({
-      code: provComponent.component_code,
-      description: provComponent.description,
+      code: 'IBP',
+      description: 'IIBB Provincial',
       type: 'IBP',
-      value: subtotals.provincial,
-      applied: true
+      value: 0,
+      applied: false,
+      reason: 'Cliente exento (EX)'
     })
+  } else if (hasMultilateral) {
+    components.push({
+      code: 'IBP',
+      description: 'IIBB Provincial',
+      type: 'IBP',
+      value: 0,
+      applied: false,
+      reason: 'Convenio Multilateral (CM)'
+    })
+  } else {
+    const provComponent = allComponents.find(
+      c => c.component_type === 'IBP' &&
+           c.province_code === input.provinceCode &&
+           c.category === input.category
+    )
 
-    // ────────────────────────────────────────────────────────────
-    // 5. COMPONENTE MUNICIPAL (si aplica)
-    // ────────────────────────────────────────────────────────────
-    if (provComponent.has_municipal) {
-      const munCode = `${input.provinceCode}M`
-      const munComponent = allComponents.find(
-        c => c.component_code === munCode && c.category === input.category
-      )
+    if (provComponent) {
+      subtotals.provincial = Number(provComponent.value)
+      components.push({
+        code: provComponent.component_code,
+        description: provComponent.description,
+        type: 'IBP',
+        value: subtotals.provincial,
+        applied: true
+      })
 
-      if (munComponent) {
-        subtotals.municipal = Number(munComponent.value)
-        components.push({
-          code: munCode,
-          description: `${provComponent.description} Municipal`,
-          type: 'IBP',
-          value: subtotals.municipal,
-          applied: true
-        })
+      // ────────────────────────────────────────────────────────────
+      // 5. COMPONENTE MUNICIPAL (si aplica)
+      // ────────────────────────────────────────────────────────────
+      if (provComponent.has_municipal) {
+        const munCode = `${input.provinceCode}M`
+        const munComponent = allComponents.find(
+          c => c.component_code === munCode && c.category === input.category
+        )
+
+        if (munComponent) {
+          subtotals.municipal = Number(munComponent.value)
+          components.push({
+            code: munCode,
+            description: `${provComponent.description} Municipal`,
+            type: 'IBP',
+            value: subtotals.municipal,
+            applied: true
+          })
+        }
       }
     }
   }

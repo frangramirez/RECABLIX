@@ -82,3 +82,13 @@ export function formatCUITInput(value: string): string {
 export function isValidCUIT(cuit: string): boolean {
   return validateCUIT(cuit).valid
 }
+
+/**
+ * Remueve los guiones de un CUIT para exportación
+ * Input: "20-12345678-9" → Output: "20123456789"
+ * Input: null/undefined → Output: ""
+ */
+export function stripCUITDashes(cuit: string | null | undefined): string {
+  if (!cuit) return ''
+  return cuit.replace(/-/g, '')
+}

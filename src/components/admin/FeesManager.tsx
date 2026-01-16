@@ -542,43 +542,48 @@ export function FeesManager({ periods }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {PROVINCES.filter((prov) => {
-                    // Filtrar solo provincias con has_municipal=true
-                    // Buscar en el componente provincial (sin M) de categoría A
+                  {PROVINCES.map((prov) => {
+                    // Verificar si tiene municipal habilitado en el componente provincial
                     const provincialComp = components.find(
                       (c) => c.component_code === prov.code && c.category === 'A'
                     )
-                    return provincialComp?.has_municipal ?? false
-                  }).map((prov) => (
-                    <TableRow key={prov.code}>
-                      <TableCell className="font-medium">{prov.name}</TableCell>
-                      {CATEGORIES.map((cat) => {
-                        const comp = components.find(
-                          (c) =>
-                            c.component_code === `${prov.code}M` && c.category === cat
-                        )
-                        return (
-                          <TableCell key={cat}>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              value={comp?.value || ''}
-                              onChange={(e) =>
-                                updateComponent(
-                                  `${prov.code}M`,
-                                  cat,
-                                  'value',
-                                  parseFloat(e.target.value) || null
-                                )
-                              }
-                              placeholder="0.00"
-                              className="w-20"
-                            />
-                          </TableCell>
-                        )
-                      })}
-                    </TableRow>
-                  ))}
+                    const hasMunicipal = provincialComp?.has_municipal ?? false
+
+                    return (
+                      <TableRow
+                        key={prov.code}
+                        className={cn(!hasMunicipal && 'bg-muted/30 opacity-60')}
+                      >
+                        <TableCell className="font-medium">{prov.name}</TableCell>
+                        {CATEGORIES.map((cat) => {
+                          const comp = components.find(
+                            (c) =>
+                              c.component_code === `${prov.code}M` && c.category === cat
+                          )
+                          return (
+                            <TableCell key={cat}>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={comp?.value || ''}
+                                onChange={(e) =>
+                                  updateComponent(
+                                    `${prov.code}M`,
+                                    cat,
+                                    'value',
+                                    parseFloat(e.target.value) || null
+                                  )
+                                }
+                                placeholder="0.00"
+                                className={cn('w-20', !hasMunicipal && 'cursor-not-allowed')}
+                                disabled={!hasMunicipal}
+                              />
+                            </TableCell>
+                          )
+                        })}
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>

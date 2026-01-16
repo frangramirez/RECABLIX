@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { Search, Pencil, Trash2, FileText, Download, RefreshCw } from 'lucide-react'
 import * as XLSX from 'xlsx'
+import { stripCUITDashes } from '@/lib/validation/cuit'
 
 interface Client {
   id: string
@@ -139,7 +140,7 @@ export function ClientsTableWithStudio({ studioId, schemaName }: Props) {
       const reca = (c.reca_client_data as any)?.[0] || {}
       return {
         Nombre: c.name,
-        CUIT: c.cuit || '',
+        CUIT: stripCUITDashes(c.cuit),
         Actividad: reca.activity || 'SERVICIOS',
         Provincia: reca.province_code || '901',
         RD: reca.works_in_rd ? 'SI' : 'NO',

@@ -67,6 +67,34 @@ export function ClientImporter() {
         CatAnt: 'D',
         CuotaAnt: 61824.18
       },
+      {
+        Nombre: 'Carlos López (Exento)',
+        CUIT: '23-11223344-5',
+        Actividad: 'SERVICIOS',
+        Provincia: 'EX',
+        RD: 'NO',
+        Jubilado: 'NO',
+        Adherentes: 0,
+        M2: '',
+        Alquiler: '',
+        MW: '',
+        CatAnt: 'B',
+        CuotaAnt: 45000
+      },
+      {
+        Nombre: 'Ana Ruiz (Conv. Multilateral)',
+        CUIT: '27-55667788-9',
+        Actividad: 'BIENES',
+        Provincia: 'CM',
+        RD: 'NO',
+        Jubilado: 'NO',
+        Adherentes: 1,
+        M2: 80,
+        Alquiler: '',
+        MW: '',
+        CatAnt: 'E',
+        CuotaAnt: 75000
+      },
     ]
     const ws = XLSX.utils.json_to_sheet(template)
     const wb = XLSX.utils.book_new()
@@ -137,12 +165,16 @@ export function ClientImporter() {
         }
 
         // 2. Insert into reca_client_data
+        // Parsear provincia: acepta códigos numéricos (901-923), 'EX' (exento), 'CM' (conv. multilateral)
+        const provinciaRaw = String(row.data.Provincia || '901').toUpperCase().trim()
+        const provinceCode = ['EX', 'CM'].includes(provinciaRaw) ? provinciaRaw : provinciaRaw || '901'
+
         const { error: recaError } = await supabase
           .from('reca_client_data')
           .insert({
             client_id: newClient.id,
             activity: ACTIVITY_MAP[row.data.Actividad?.toUpperCase()] || 'SERVICIOS',
-            province_code: String(row.data.Provincia || '901'),
+            province_code: provinceCode,
             works_in_rd: row.data.RD?.toUpperCase() === 'SI',
             is_retired: row.data.Jubilado?.toUpperCase() === 'SI',
             dependents: parseInt(row.data.Adherentes) || 0,
@@ -186,6 +218,9 @@ export function ClientImporter() {
           </Button>
           <p className="text-sm text-gray-500 mt-2">
             Columnas: {EXPECTED_COLUMNS.join(', ')}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Provincia: código numérico (901-923), EX (exento IIBB), o CM (convenio multilateral)
           </p>
         </CardContent>
       </Card>
