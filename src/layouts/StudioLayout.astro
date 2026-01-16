@@ -4,6 +4,7 @@ import { StudioHeader } from '@/components/studio/StudioHeader'
 import { SessionInit } from '@/components/providers/SessionProvider'
 import { StudioLayoutWrapper } from '@/components/studio/StudioLayoutWrapper'
 import { Toaster } from '@/components/ui/sonner'
+import { getTenantSchemaName } from '@/lib/config'
 
 interface Props {
   title?: string
@@ -19,7 +20,8 @@ const studioData = studio
       name: studio.name,
       slug: studio.slug,
       is_superadmin: studio.is_superadmin,
-      schema_name: studio.schema_name,
+      // Fallback defensivo: generar schema_name si es null/undefined
+      schema_name: studio.schema_name || getTenantSchemaName(studio.id),
     }
   : null
 

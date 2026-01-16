@@ -1,10 +1,28 @@
 import { useMemo } from 'react'
 import { supabase, createTenantQuery } from '@/lib/supabase'
-import { config } from '@/lib/config'
+import { config, getTenantSchemaName } from '@/lib/config'
 
 interface TenantContext {
   studioId: string
   schemaName: string
+}
+
+/**
+ * Valida que el schemaName tenga el formato correcto (tenant_xxx)
+ * y genera uno válido si es necesario
+ */
+function getValidSchemaName(context: TenantContext): string {
+  const { studioId, schemaName } = context
+
+  // Si el schemaName está vacío, es null, o no tiene el prefijo correcto, generarlo
+  if (!schemaName || !schemaName.startsWith('tenant_')) {
+    console.warn(
+      `[useTenantSupabase] Invalid schemaName "${schemaName}" for studio ${studioId}, generating from studioId`
+    )
+    return getTenantSchemaName(studioId)
+  }
+
+  return schemaName
 }
 
 /**
@@ -36,7 +54,8 @@ export function useTenantSupabase(context: TenantContext | null) {
       }
     }
 
-    const { schemaName } = context
+    // Validar y obtener un schemaName válido
+    const validSchemaName = getValidSchemaName(context)
 
     return {
       /**
@@ -44,7 +63,7 @@ export function useTenantSupabase(context: TenantContext | null) {
        * Si USE_TENANT_SCHEMAS=true y tabla es de tenant → usa tenant schema
        * De lo contrario → usa public schema
        */
-      query: (table: string) => createTenantQuery(supabase, schemaName, table),
+      query: (table: string) => createTenantQuery(supabase, validSchemaName, table),
 
       /**
        * Query explícita a schema public (para tablas maestras)
@@ -55,13 +74,13 @@ export function useTenantSupabase(context: TenantContext | null) {
        * Query explícita al tenant schema
        * Útil cuando querés forzar el uso del tenant schema
        */
-      tenantQuery: (table: string) => supabase.schema(schemaName).from(table),
+      tenantQuery: (table: string) => supabase.schema(validSchemaName).from(table),
 
       /** Si el hook está listo para usar */
       isReady: true,
 
       /** Nombre del schema actual */
-      schemaName,
+      schemaName: validSchemaName,
 
       /** Si tenant schemas está activo */
       useTenantSchemas: config.USE_TENANT_SCHEMAS,
