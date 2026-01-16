@@ -11,6 +11,7 @@ import { supabaseAdmin } from '@/lib/supabase'
 import { config, getTenantSchemaName } from '@/lib/config'
 
 interface ClientInput {
+  studioId?: string // Para superadmins creando en otro studio
   name: string
   cuit: string | null
   uses_recablix: boolean
@@ -61,7 +62,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     const input: ClientInput = await request.json()
-    const studioId = session.studio.id
+
+    // Si es superadmin y se especifica studioId, usar ese; sino usar el de la sesión
+    const studioId = (session.is_superadmin && input.studioId)
+      ? input.studioId
+      : session.studio.id
 
     // Determinar si usar tenant schema o public
     const useTenantSchemas = config.USE_TENANT_SCHEMAS

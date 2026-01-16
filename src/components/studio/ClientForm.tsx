@@ -189,6 +189,7 @@ export function ClientForm({ initialData, studioId, schemaName, returnUrl = '/st
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            studioId, // Para superadmins creando en otro studio
             name: formData.name,
             cuit: formData.cuit,
             uses_recablix: formData.uses_recablix,
