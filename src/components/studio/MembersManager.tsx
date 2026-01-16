@@ -9,6 +9,7 @@ import { useStore } from '@nanostores/react'
 import { $session } from '@/stores/session'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   Table,
   TableBody,
@@ -25,9 +26,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Pencil, Trash2, Shield, UserPlus } from 'lucide-react'
+import { Pencil, Trash2, Shield, UserPlus, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Member {
@@ -100,6 +108,12 @@ export function MembersManager() {
   const [editingMember, setEditingMember] = useState<Member | null>(null)
   const [editedPermissions, setEditedPermissions] = useState<Member['permissions']>({})
   const [isDialogOpen, setIsDialogOpen] = useState(false)
+
+  // Invite dialog state
+  const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState<'admin' | 'collaborator' | 'client'>('collaborator')
+  const [inviting, setInviting] = useState(false)
 
   const canManageMembers = is_superadmin || role === 'owner' || role === 'admin'
 
@@ -211,6 +225,62 @@ export function MembersManager() {
     }
   }
 
+  const handleInviteMember = async () => {
+    if (!studio?.id) {
+      toast.error('Error: No se pudo identificar el estudio')
+      return
+    }
+
+    if (!inviteEmail.trim()) {
+      toast.error('Ingrese un email válido')
+      return
+    }
+
+    // Validación básica de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(inviteEmail)) {
+      toast.error('El formato del email no es válido')
+      return
+    }
+
+    try {
+      setInviting(true)
+      const response = await fetch('/api/studio/members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studio_id: studio.id,
+          email: inviteEmail.trim().toLowerCase(),
+          role: inviteRole,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success(`Miembro agregado: ${inviteEmail}`)
+      setIsInviteDialogOpen(false)
+      setInviteEmail('')
+      setInviteRole('collaborator')
+      fetchMembers()
+    } catch (error) {
+      console.error('Error inviting member:', error)
+      toast.error('Error al agregar miembro')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const openInviteDialog = () => {
+    setInviteEmail('')
+    setInviteRole('collaborator')
+    setIsInviteDialogOpen(true)
+  }
+
   const getRoleBadgeColor = (memberRole: string) => {
     switch (memberRole) {
       case 'owner':
@@ -259,7 +329,7 @@ export function MembersManager() {
       <div className="flex justify-between items-center">
         <h2 className="text-lg font-semibold">Miembros del Studio</h2>
         {(is_superadmin || role === 'owner') && (
-          <Button onClick={() => toast.info('Función de invitar pendiente')}>
+          <Button onClick={openInviteDialog}>
             <UserPlus className="h-4 w-4 mr-2" />
             Invitar Miembro
           </Button>
@@ -381,6 +451,96 @@ export function MembersManager() {
             {editingMember?.role !== 'owner' && (
               <Button onClick={handleSavePermissions}>Guardar Cambios</Button>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Invitar Miembro */}
+      <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Invitar Miembro</DialogTitle>
+            <DialogDescription>
+              Agregue un nuevo miembro al estudio. El usuario debe tener una cuenta registrada.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="invite-email">Email del usuario</Label>
+              <Input
+                id="invite-email"
+                type="email"
+                placeholder="usuario@ejemplo.com"
+                value={inviteEmail}
+                onChange={e => setInviteEmail(e.target.value)}
+                disabled={inviting}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="invite-role">Rol</Label>
+              <Select
+                value={inviteRole}
+                onValueChange={(value: 'admin' | 'collaborator' | 'client') =>
+                  setInviteRole(value)
+                }
+                disabled={inviting}
+              >
+                <SelectTrigger id="invite-role">
+                  <SelectValue placeholder="Seleccionar rol" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Administrador</span>
+                      <span className="text-xs text-muted-foreground">
+                        Acceso completo al estudio
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="collaborator">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Colaborador</span>
+                      <span className="text-xs text-muted-foreground">
+                        Puede gestionar clientes y operaciones
+                      </span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="client">
+                    <div className="flex flex-col">
+                      <span className="font-medium">Cliente</span>
+                      <span className="text-xs text-muted-foreground">
+                        Solo puede ver sus propios datos
+                      </span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsInviteDialogOpen(false)}
+              disabled={inviting}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={handleInviteMember} disabled={inviting}>
+              {inviting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Agregando...
+                </>
+              ) : (
+                <>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Agregar Miembro
+                </>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
