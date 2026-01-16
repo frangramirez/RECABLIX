@@ -18,18 +18,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           (c): c is { name: string; value: string } => typeof c.value === 'string'
         )
       },
-      setAll(cookies) {
+      setAll(newCookies) {
         // Capturar cookies para incluir en response
-        cookiesToSet.push(...cookies)
-        // También setear en Astro cookies (por si acaso)
-        for (const { name, value, options } of cookies) {
-          cookies.set(name, value, {
-            path: '/',
-            secure: import.meta.env.PROD,
-            sameSite: 'lax',
-            ...options,
-          } as Parameters<typeof cookies.set>[2])
-        }
+        cookiesToSet.push(...newCookies)
       },
     },
   })
