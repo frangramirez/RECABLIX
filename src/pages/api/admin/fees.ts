@@ -42,6 +42,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       )
     }
 
+<<<<<<< Updated upstream
     const { data, error } = await supabaseAdmin.from('reca_fee_components').upsert(
       components.map((c) => {
         // Solo incluir id si existe (evita null constraint violation)
@@ -64,8 +65,35 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       }),
       {
         onConflict: 'reca_id,component_code,category',
+=======
+    // Filtrar componentes que tienen id undefined/null para evitar constraint violation
+    const recordsToUpsert = components.map((c) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const record: any = {
+        reca_id: c.reca_id,
+        component_code: c.component_code,
+        description: c.description,
+        component_type: c.component_type,
+        category: c.category,
+        value: c.value,
+        province_code: c.province_code,
+        has_municipal: c.has_municipal,
+        has_integrated_iibb: c.has_integrated_iibb,
+>>>>>>> Stashed changes
       }
-    ).select()
+      // Solo agregar id si existe y es válido
+      if (c.id && c.id.length > 0) {
+        record.id = c.id
+      }
+      return record
+    })
+
+    const { data, error } = await supabaseAdmin
+      .from('reca_fee_components')
+      .upsert(recordsToUpsert, {
+        onConflict: 'reca_id,component_code,category',
+      })
+      .select()
 
     if (error) {
       console.error('Error saving fee components:', error)
@@ -80,10 +108,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
 
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : 'Error interno del servidor'
     console.error('Fees API error:', err)
     return new Response(
-      JSON.stringify({ error: err.message || 'Error interno del servidor' }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }
