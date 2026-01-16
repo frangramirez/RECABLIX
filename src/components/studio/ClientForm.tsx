@@ -26,8 +26,8 @@ interface ClientData {
   has_multilateral: boolean
   // Nuevos campos de local
   has_local: boolean
-  rents_local: boolean
-  lessor_cuit: string | null
+  is_rented: boolean
+  landlord_cuit: string | null
   // Parámetros físicos
   local_m2: number | null
   annual_rent: number | null
@@ -39,6 +39,8 @@ interface ClientData {
 interface Props {
   initialData?: ClientData
   studioId: string
+  schemaName?: string
+  returnUrl?: string
 }
 
 const ACTIVITIES = [
@@ -65,16 +67,18 @@ const PROVINCES = [
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
-export function ClientForm({ initialData, studioId }: Props) {
+export function ClientForm({ initialData, studioId, schemaName, returnUrl = '/studio/clients' }: Props) {
   const [loading, setLoading] = useState(false)
   const [cuitError, setCuitError] = useState<string | null>(null)
-  const [lessorCuitError, setLessorCuitError] = useState<string | null>(null)
+  const [landlordCuitError, setLandlordCuitError] = useState<string | null>(null)
 
-  // Tenant queries
+  // Tenant queries - usar props si están disponibles, sino session
   const session = useSession()
-  const tenantContext = session.studio
-    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
-    : null
+  const tenantContext = schemaName
+    ? { studioId, schemaName }
+    : session.studio
+      ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+      : null
   const { query } = useTenantSupabase(tenantContext)
 
   const [formData, setFormData] = useState<ClientData>({
@@ -89,8 +93,8 @@ export function ClientForm({ initialData, studioId }: Props) {
     is_exempt: initialData?.is_exempt || false,
     has_multilateral: initialData?.has_multilateral || false,
     has_local: initialData?.has_local || false,
-    rents_local: initialData?.rents_local || false,
-    lessor_cuit: initialData?.lessor_cuit || null,
+    is_rented: initialData?.is_rented || false,
+    landlord_cuit: initialData?.landlord_cuit || null,
     local_m2: initialData?.local_m2 || null,
     annual_rent: initialData?.annual_rent || null,
     annual_mw: initialData?.annual_mw || null,
@@ -112,13 +116,13 @@ export function ClientForm({ initialData, studioId }: Props) {
     }
 
     // Validar CUIT del locador si alquila
-    if (formData.rents_local && !formData.lessor_cuit) {
+    if (formData.is_rented && !formData.landlord_cuit) {
       toast({ variant: 'destructive', title: 'Error', description: 'CUIT del locador es obligatorio cuando alquilas el local' })
       return
     }
 
-    if (formData.rents_local && formData.lessor_cuit) {
-      const lessorCuitValidation = validateCUIT(formData.lessor_cuit)
+    if (formData.is_rented && formData.landlord_cuit) {
+      const lessorCuitValidation = validateCUIT(formData.landlord_cuit)
       if (!lessorCuitValidation.valid) {
         toast({ variant: 'destructive', title: 'Error', description: `CUIT locador: ${lessorCuitValidation.error}` })
         return
@@ -166,8 +170,8 @@ export function ClientForm({ initialData, studioId }: Props) {
             is_exempt: formData.is_exempt,
             has_multilateral: formData.has_multilateral,
             has_local: formData.has_local,
-            rents_local: formData.rents_local,
-            lessor_cuit: formData.lessor_cuit?.trim() || null,
+            is_rented: formData.is_rented,
+            landlord_cuit: formData.landlord_cuit?.trim() || null,
             local_m2: formData.local_m2,
             annual_rent: formData.annual_rent,
             annual_mw: formData.annual_mw,
@@ -196,8 +200,8 @@ export function ClientForm({ initialData, studioId }: Props) {
             is_exempt: formData.is_exempt,
             has_multilateral: formData.has_multilateral,
             has_local: formData.has_local,
-            rents_local: formData.rents_local,
-            lessor_cuit: formData.lessor_cuit,
+            is_rented: formData.is_rented,
+            landlord_cuit: formData.landlord_cuit,
             local_m2: formData.local_m2,
             annual_rent: formData.annual_rent,
             annual_mw: formData.annual_mw,
@@ -215,7 +219,7 @@ export function ClientForm({ initialData, studioId }: Props) {
         toast({ title: 'Creado', description: 'Cliente creado correctamente' })
       }
 
-      window.location.href = '/studio/clients'
+      window.location.href = returnUrl
     } catch (error: any) {
       toast({ variant: 'destructive', title: 'Error', description: error.message })
     } finally {
@@ -378,9 +382,9 @@ export function ClientForm({ initialData, studioId }: Props) {
                   // Si desactiva, limpiar todos los campos relacionados
                   updateField('local_m2', null)
                   updateField('annual_mw', null)
-                  updateField('rents_local', false)
+                  updateField('is_rented', false)
                   updateField('annual_rent', null)
-                  updateField('lessor_cuit', null)
+                  updateField('landlord_cuit', null)
                   setLessorCuitError(null)
                 }
               }}
@@ -420,12 +424,12 @@ export function ClientForm({ initialData, studioId }: Props) {
                   <p className="text-xs text-gray-500">Sos locatario del local</p>
                 </div>
                 <Switch
-                  checked={formData.rents_local}
+                  checked={formData.is_rented}
                   onCheckedChange={(v) => {
-                    updateField('rents_local', v)
+                    updateField('is_rented', v)
                     if (!v) {
                       updateField('annual_rent', null)
-                      updateField('lessor_cuit', null)
+                      updateField('landlord_cuit', null)
                       setLessorCuitError(null)
                     }
                   }}
@@ -433,7 +437,7 @@ export function ClientForm({ initialData, studioId }: Props) {
               </div>
 
               {/* Campos condicionales si alquila */}
-              {formData.rents_local && (
+              {formData.is_rented && (
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="annual_rent">Alquiler Anual ($) *</Label>
@@ -448,23 +452,23 @@ export function ClientForm({ initialData, studioId }: Props) {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="lessor_cuit">CUIT Locador *</Label>
+                    <Label htmlFor="landlord_cuit">CUIT Locador *</Label>
                     <Input
-                      id="lessor_cuit"
-                      value={formData.lessor_cuit || ''}
+                      id="landlord_cuit"
+                      value={formData.landlord_cuit || ''}
                       onChange={(e) => {
                         const formatted = formatCUITInput(e.target.value)
-                        updateField('lessor_cuit', formatted)
+                        updateField('landlord_cuit', formatted)
                         const validation = validateCUIT(formatted)
                         setLessorCuitError(validation.error || null)
                       }}
                       placeholder="XX-XXXXXXXX-X"
                       maxLength={13}
-                      className={lessorCuitError ? 'border-destructive' : ''}
+                      className={landlordCuitError ? 'border-destructive' : ''}
                       required
                     />
-                    {lessorCuitError && (
-                      <p className="text-xs text-destructive mt-1">{lessorCuitError}</p>
+                    {landlordCuitError && (
+                      <p className="text-xs text-destructive mt-1">{landlordCuitError}</p>
                     )}
                   </div>
                 </div>
@@ -505,7 +509,7 @@ export function ClientForm({ initialData, studioId }: Props) {
 
       <div className="flex gap-4">
         <Button type="button" variant="outline" asChild>
-          <a href="/studio/clients"><ArrowLeft className="h-4 w-4 mr-2" />Volver</a>
+          <a href={returnUrl}><ArrowLeft className="h-4 w-4 mr-2" />Volver</a>
         </Button>
         <Button type="submit" disabled={loading}>
           <Save className="h-4 w-4 mr-2" />{loading ? 'Guardando...' : 'Guardar'}
