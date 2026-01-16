@@ -78,7 +78,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       try {
         // 1. Insert into clients (tenant schema)
         const { data: newClient, error: clientError } = await supabaseAdmin
-          .from(`${schemaName}.clients`)
+          .schema(schemaName).from('clients')
           .insert({
             name: client.name,
             cuit: client.cuit || null,
@@ -95,7 +95,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
         // 2. Insert into reca_client_data (tenant schema)
         const { error: recaError } = await supabaseAdmin
-          .from(`${schemaName}.reca_client_data`)
+          .schema(schemaName).from('reca_client_data')
           .insert({
             client_id: newClient.id,
             activity: client.activity || 'SERVICIOS',
@@ -112,7 +112,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
         if (recaError) {
           // Rollback: delete the client
-          await supabaseAdmin.from(`${schemaName}.clients`).delete().eq('id', newClient.id)
+          await supabaseAdmin.schema(schemaName).from('clients').delete().eq('id', newClient.id)
           errors.push({ row: i + 1, error: `Error guardando datos RECA: ${recaError.message}` })
         } else {
           success++
