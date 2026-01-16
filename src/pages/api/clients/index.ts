@@ -8,7 +8,7 @@
 import type { APIRoute } from 'astro'
 import { getStudioFromSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { config, getTenantSchemaName } from '@/lib/config'
+import { config } from '@/lib/config'
 
 interface ClientInput {
   studioId?: string // Para superadmins creando en otro studio
@@ -70,9 +70,41 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     // Determinar si usar tenant schema o public
     const useTenantSchemas = config.USE_TENANT_SCHEMAS
-    const tenantSchema = useTenantSchemas
-      ? getTenantSchemaName(studioId)
-      : null
+    let tenantSchema: string | null = null
+
+    if (useTenantSchemas) {
+      // Buscar schema_name del studio en la BD
+      const { data: studioRecord } = await supabaseAdmin
+        .from('studios')
+        .select('schema_name')
+        .eq('id', studioId)
+        .single()
+
+      if (studioRecord?.schema_name) {
+        tenantSchema = studioRecord.schema_name
+      } else {
+        // Si no tiene schema, crear el tenant schema automáticamente
+        const { data: createResult, error: createError } = await supabaseAdmin
+          .rpc('create_reca_tenant', { p_studio_id: studioId })
+
+        if (createError) {
+          console.error('Error creando tenant schema:', createError)
+          return new Response(
+            JSON.stringify({ error: 'Error al crear tenant schema: ' + createError.message }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // El schema se creó, obtener el nombre
+        tenantSchema = `tenant_${studioId.replace(/-/g, '_')}`
+
+        // Actualizar el schema_name en la BD
+        await supabaseAdmin
+          .from('studios')
+          .update({ schema_name: tenantSchema })
+          .eq('id', studioId)
+      }
+    }
 
     // Preparar datos del cliente
     const clientData = useTenantSchemas
