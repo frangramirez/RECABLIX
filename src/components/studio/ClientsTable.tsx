@@ -255,7 +255,7 @@ export function ClientsTable() {
                           <Pencil className="h-4 w-4" />
                         </a>
                       </Button>
-                      <Button variant="ghost" size="icon" asChild>
+                      <Button variant="ghost" size="icon" className="text-blue-600 hover:text-blue-700 hover:bg-blue-50" asChild>
                         <a href={`/studio/clients/${client.id}/transactions`}>
                           <FileText className="h-4 w-4" />
                         </a>

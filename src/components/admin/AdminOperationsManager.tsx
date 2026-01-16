@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useStore } from '@nanostores/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, Upload, Download, TrendingUp, TrendingDown, Search, AlertCircle } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { useSession } from '@/components/providers/SessionProvider'
+import { $impersonatedStudio, loadImpersonatedStudio } from '@/stores/impersonate'
 
 interface Transaction {
   id: string
@@ -50,11 +51,15 @@ export function AdminOperationsManager({ ownStudioId, activePeriod: serverActive
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const { toast } = useToast()
 
-  const session = useSession()
+  const impersonated = useStore($impersonatedStudio)
 
   // Usar estudio impersonado o el propio
-  const activeStudioId = session?.is_impersonating ? session.studio?.id : ownStudioId
-  const isImpersonating = session?.is_impersonating || false
+  const activeStudioId = impersonated?.id || ownStudioId
+  const isImpersonating = !!impersonated
+
+  useEffect(() => {
+    loadImpersonatedStudio()
+  }, [])
 
   useEffect(() => {
     if (activeStudioId) {
@@ -300,7 +305,7 @@ export function AdminOperationsManager({ ownStudioId, activePeriod: serverActive
           <p className="text-sm text-amber-600">
             {isImpersonating
               ? 'Selecciona un estudio en el header para ver sus operaciones.'
-              : 'Configura tu estudio en "Mi Estudio" o impersona uno en "Estudios".'}
+              : 'Configura tu estudio en "Mi Estudio" o selecciona uno en el header.'}
           </p>
         </div>
       </div>
@@ -312,11 +317,11 @@ export function AdminOperationsManager({ ownStudioId, activePeriod: serverActive
   return (
     <div className="space-y-6">
       {/* Indicador de impersonación */}
-      {isImpersonating && session?.studio && (
+      {isImpersonating && (
         <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
           <AlertCircle className="h-4 w-4 text-amber-600" />
           <p className="text-sm text-amber-700">
-            Viendo operaciones de: <span className="font-semibold">{session.studio.name}</span>
+            Viendo operaciones de: <span className="font-semibold">{impersonated?.name}</span>
           </p>
         </div>
       )}

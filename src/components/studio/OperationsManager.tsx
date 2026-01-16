@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,8 +12,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useToast } from '@/hooks/use-toast'
 import { Plus, Pencil, Trash2, Upload, Download, TrendingUp, TrendingDown, Search } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { useSession } from '@/components/providers/SessionProvider'
-import { useTenantSupabase } from '@/hooks/useTenantSupabase'
 
 interface Transaction {
   id: string
@@ -49,22 +48,14 @@ export function OperationsManager({ activePeriod }: Props) {
   const [selectedClientId, setSelectedClientId] = useState<string>('')
   const { toast } = useToast()
 
-  const session = useSession()
-  const tenantContext = session.studio ? {
-    studioId: session.studio.id,
-    schemaName: session.studio.schema_name
-  } : null
-  const { query, isReady } = useTenantSupabase(tenantContext)
-
   useEffect(() => {
-    if (isReady) {
-      fetchData()
-    }
-  }, [isReady])
+    fetchData()
+  }, [])
 
   const fetchData = async () => {
-    // Fetch clients con recablix (usa tenant schema automáticamente)
-    const { data: clientsData } = await query('clients')
+    // Fetch clients con recablix
+    const { data: clientsData } = await supabase
+      .from('clients')
       .select('id, name, cuit')
       .contains('apps', ['recablix'])
       .order('name')
@@ -72,7 +63,8 @@ export function OperationsManager({ activePeriod }: Props) {
     setClients(clientsData || [])
 
     // Fetch todas las transacciones con datos del cliente
-    const { data: txData, error } = await query('reca_transactions')
+    const { data: txData, error } = await supabase
+      .from('reca_transactions')
       .select(`
         id,
         client_id,
@@ -107,7 +99,7 @@ export function OperationsManager({ activePeriod }: Props) {
     e.preventDefault()
     const formData = new FormData(e.currentTarget)
 
-    const clientId = selectedClientId || editingTransaction?.client_id
+    const clientId = formData.get('client_id') as string
     if (!clientId) {
       toast({ variant: 'destructive', title: 'Error', description: 'Seleccione un cliente' })
       return
@@ -124,10 +116,10 @@ export function OperationsManager({ activePeriod }: Props) {
 
     let error
     if (editingTransaction) {
-      const result = await query('reca_transactions').update(data).eq('id', editingTransaction.id)
+      const result = await supabase.from('reca_transactions').update(data).eq('id', editingTransaction.id)
       error = result.error
     } else {
-      const result = await query('reca_transactions').insert(data)
+      const result = await supabase.from('reca_transactions').insert(data)
       error = result.error
     }
 
@@ -144,7 +136,7 @@ export function OperationsManager({ activePeriod }: Props) {
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar esta transacción?')) return
-    const { error } = await query('reca_transactions').delete().eq('id', id)
+    const { error } = await supabase.from('reca_transactions').delete().eq('id', id)
     if (error) {
       toast({ variant: 'destructive', title: 'Error', description: error.message })
     } else {
@@ -204,7 +196,7 @@ export function OperationsManager({ activePeriod }: Props) {
         description: row.Descripcion || null,
       }
 
-      const { error } = await query('reca_transactions').insert(txData)
+      const { error } = await supabase.from('reca_transactions').insert(txData)
       if (!error) success++
       else errors.push(`Error al insertar para ${client.name}: ${error.message}`)
     }
@@ -282,7 +274,7 @@ export function OperationsManager({ activePeriod }: Props) {
 
   const formatPeriod = (p: string) => `${p.slice(0,4)}/${p.slice(4)}`
 
-  if (loading || !isReady) return <div className="text-center py-8">Cargando...</div>
+  if (loading) return <div className="text-center py-8">Cargando...</div>
 
   return (
     <div className="space-y-6">
@@ -394,6 +386,7 @@ export function OperationsManager({ activePeriod }: Props) {
                   <div>
                     <Label>Cliente *</Label>
                     <Select
+                      name="client_id"
                       value={selectedClientId || editingTransaction?.client_id || ''}
                       onValueChange={setSelectedClientId}
                     >

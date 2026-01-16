@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import { createServerClient, parseCookieHeader } from '@supabase/ssr'
+import { createServerClient, createBrowserClient, parseCookieHeader } from '@supabase/ssr'
 import type { AstroCookies } from 'astro'
 import { config, isTenantTable } from './config'
 
@@ -7,8 +7,19 @@ const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY
 const supabaseServiceKey = import.meta.env.SUPABASE_SERVICE_KEY
 
-// Cliente para uso en el browser
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Cliente para uso en el browser (lazy initialization)
+// Se crea solo cuando se usa, asegurando que las cookies estén disponibles
+let _supabaseBrowser: ReturnType<typeof createBrowserClient> | null = null
+
+export const supabase = new Proxy({} as ReturnType<typeof createBrowserClient>, {
+  get(_target, prop) {
+    if (!_supabaseBrowser) {
+      _supabaseBrowser = createBrowserClient(supabaseUrl, supabaseAnonKey)
+    }
+    const value = (_supabaseBrowser as any)[prop]
+    return typeof value === 'function' ? value.bind(_supabaseBrowser) : value
+  }
+})
 
 // Cliente de servicio (bypassa RLS) - solo usar en server
 export const supabaseAdmin = supabaseServiceKey

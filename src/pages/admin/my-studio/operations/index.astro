@@ -1,31 +1,28 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro'
 import { AdminOperationsManager } from '@/components/admin/AdminOperationsManager'
-import { createSupabaseServerClient, getStudioFromSession } from '@/lib/auth'
+import { createSupabaseServerClient } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
 
-// Obtener sesión completa (incluye impersonación via cookie)
-const session = await getStudioFromSession(Astro.cookies, Astro.request)
+// Obtener studio del superadmin
+const studio = Astro.locals.studio
+let superadminStudioId: string | null = null
 
-let ownStudioId: string | null = null
-
-// Si está impersonando, el studio_id ya viene en session.studio
-// Si no, buscar el studio propio del superadmin
-if (session?.is_impersonating && session.studio) {
-  ownStudioId = session.studio.id
-} else if (session?.is_superadmin && supabaseAdmin) {
-  // Buscar studio donde el superadmin es miembro
+if (studio?.is_superadmin && supabaseAdmin) {
   const { data: membership } = await supabaseAdmin
     .from('studio_members')
     .select('studio_id')
-    .eq('user_id', session.user?.id)
-    .limit(1)
+    .eq('user_id', studio.id)
     .single()
 
   if (membership) {
-    ownStudioId = membership.studio_id
+    superadminStudioId = membership.studio_id
   }
 }
+
+// También verificar si hay studioId en query param (para impersonate)
+const queryStudioId = Astro.url.searchParams.get('studioId')
+const effectiveStudioId = queryStudioId || superadminStudioId
 
 // Obtener período activo
 const supabase = createSupabaseServerClient(Astro.cookies)
@@ -46,7 +43,7 @@ const { data: activePeriod } = await supabase
     </div>
     <AdminOperationsManager
       client:load
-      ownStudioId={ownStudioId}
+      ownStudioId={effectiveStudioId}
       activePeriod={activePeriod}
     />
   </div>

@@ -15,6 +15,7 @@ const { data: client } = await supabase
     id,
     name,
     cuit,
+    apps,
     reca_client_data (
       activity,
       province_code,
@@ -40,10 +41,12 @@ if (!client) return Astro.redirect('/studio/clients')
 
 // Flatten nested structure for form
 const reca = (client.reca_client_data as any)?.[0] || {}
+const apps = (client.apps as string[]) || []
 const flattenedClient = {
   id: client.id,
   name: client.name,
   cuit: client.cuit,
+  uses_recablix: apps.includes('recablix'),
   activity: reca.activity || 'SERVICIOS',
   province_code: reca.province_code || '901',
   works_in_rd: reca.works_in_rd || false,
