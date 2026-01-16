@@ -135,7 +135,7 @@ export async function getScalesForPeriod(
   recaId: string
 ): Promise<Scale[]> {
   const { data, error } = await supabase
-    .from('scales')
+    .from('reca_scales')
     .select('category, max_annual_income, max_local_m2, max_annual_mw, max_annual_rent')
     .eq('reca_id', recaId)
     .order('category')
@@ -155,7 +155,7 @@ export async function getFeeComponentsForPeriod(
   recaId: string
 ): Promise<FeeComponentData[]> {
   const { data, error } = await supabase
-    .from('fee_components')
+    .from('reca_fee_components')
     .select('component_code, description, component_type, category, value, province_code, has_municipal')
     .eq('reca_id', recaId)
 

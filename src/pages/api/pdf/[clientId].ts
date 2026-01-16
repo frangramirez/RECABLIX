@@ -54,7 +54,7 @@ export const GET: APIRoute = async ({ params, cookies, locals, url }) => {
 
   // Obtener escalas
   const { data: scales } = await supabase
-    .from('scales')
+    .from('reca_scales')
     .select('category, max_annual_income, max_local_m2, max_annual_mw, max_annual_rent')
     .eq('reca_id', period.id)
     .order('category')
