@@ -27,15 +27,17 @@ const studioData = studio
 let superadminStudioId: string | null = null
 let superadminStudioName: string | null = null
 
-if (studio?.is_superadmin && supabaseAdmin) {
+if (studio?.is_superadmin && studio?.user_id && supabaseAdmin) {
   // El superadmin puede tener un estudio diferente al que viene en la sesión
-  // Buscamos específicamente su membresía
-  const { data: membership } = await supabaseAdmin
+  // Buscamos específicamente su membresía usando el user_id
+  // Usamos limit(1) porque el usuario puede tener múltiples membresías
+  const { data: memberships } = await supabaseAdmin
     .from('studio_members')
     .select('studio_id, studios(id, name)')
-    .eq('user_id', studio.id)
-    .single()
+    .eq('user_id', studio.user_id)
+    .limit(1)
 
+  const membership = memberships?.[0]
   if (membership?.studios) {
     // studios puede ser un array o un objeto dependiendo de la relación
     const studioInfo = Array.isArray(membership.studios)

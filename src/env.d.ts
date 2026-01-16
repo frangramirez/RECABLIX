@@ -15,6 +15,8 @@ interface ImportMeta {
 
 interface Studio {
   id: string
+  /** ID del usuario autenticado (auth.users.id) */
+  user_id: string
   name: string
   slug: string
   is_superadmin: boolean

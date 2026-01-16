@@ -43,6 +43,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Agregar studio al locals para uso en páginas
   context.locals.studio = {
     id: studio.studio.id,
+    user_id: studio.user.id,  // ID del usuario autenticado
     name: studio.studio.name,
     slug: studio.studio.slug,
     is_superadmin: studio.is_superadmin,
