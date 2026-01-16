@@ -52,19 +52,77 @@ interface FeeComponent {
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
-// Formatear número con separador de miles (ej: 1234567.89 → "1.234.567,89")
-function formatNumber(value: number | null | undefined): string {
+// Formatear número con separador de miles para display (ej: 1234567.89 → "1.234.567,89")
+function formatDisplayNumber(value: number | null | undefined): string {
   if (value === null || value === undefined || isNaN(value)) return ''
   return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// Parsear string formateado a número (ej: "1.234.567,89" → 1234567.89)
-function parseFormattedNumber(str: string): number | null {
+// Formatear para edición: sin separador de miles, coma decimal (ej: 1234567.89 → "1234567,89")
+function formatEditNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) return ''
+  if (Number.isInteger(value)) return String(value)
+  return String(value).replace('.', ',')
+}
+
+// Parsear string a número (acepta formato argentino con coma)
+function parseInputNumber(str: string): number | null {
   if (!str.trim()) return null
-  // Remover separadores de miles (puntos) y convertir coma decimal a punto
   const normalized = str.replace(/\./g, '').replace(',', '.')
   const num = parseFloat(normalized)
   return isNaN(num) ? null : num
+}
+
+// Validar input: solo dígitos, una coma, max 2 decimales
+function sanitizeInput(value: string): string {
+  let sanitized = value.replace(/[^\d,]/g, '')
+  const parts = sanitized.split(',')
+  if (parts.length > 2) {
+    sanitized = parts[0] + ',' + parts.slice(1).join('')
+  }
+  if (parts.length === 2 && parts[1].length > 2) {
+    sanitized = parts[0] + ',' + parts[1].slice(0, 2)
+  }
+  return sanitized
+}
+
+// Componente Input para moneda con formateo argentino
+interface CurrencyInputProps {
+  value: number | null | undefined
+  onChange: (value: number | null) => void
+  disabled?: boolean
+  className?: string
+}
+
+function CurrencyInput({ value, onChange, disabled, className }: CurrencyInputProps) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [editValue, setEditValue] = useState('')
+
+  const displayValue = isEditing ? editValue : formatDisplayNumber(value)
+
+  return (
+    <Input
+      type="text"
+      inputMode="decimal"
+      value={displayValue}
+      onChange={(e) => {
+        const sanitized = sanitizeInput(e.target.value)
+        setEditValue(sanitized)
+      }}
+      onFocus={() => {
+        setIsEditing(true)
+        setEditValue(formatEditNumber(value))
+      }}
+      onBlur={() => {
+        setIsEditing(false)
+        const parsed = parseInputNumber(editValue)
+        onChange(parsed)
+      }}
+      placeholder="0"
+      disabled={disabled}
+      className={className}
+    />
+  )
 }
 
 const PROVINCES = [
@@ -524,30 +582,15 @@ export function FeesManager({ periods }: Props) {
                               c.component_code === prov.code && c.category === cat
                           )
                           return (
-                            <TableCell key={cat} className="px-0.5 py-1 text-center">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={formatNumber(comp?.value)}
-                                onChange={(e) => {
-                                  const parsed = parseFormattedNumber(e.target.value)
-                                  updateComponent(prov.code, cat, 'value', parsed)
-                                }}
-                                onFocus={(e) => {
-                                  if (comp?.value !== null && comp?.value !== undefined) {
-                                    e.target.value = String(comp.value)
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  const parsed = parseFormattedNumber(e.target.value)
-                                  updateComponent(prov.code, cat, 'value', parsed)
-                                }}
-                                placeholder="0,00"
+                            <TableCell key={cat} className="px-0.5 py-1">
+                              <CurrencyInput
+                                value={comp?.value}
+                                onChange={(val) => updateComponent(prov.code, cat, 'value', val)}
+                                disabled={!hasIntegrated}
                                 className={cn(
-                                  'w-24 text-right tabular-nums mx-auto',
+                                  'w-full text-right tabular-nums',
                                   !hasIntegrated && 'cursor-not-allowed'
                                 )}
-                                disabled={!hasIntegrated}
                               />
                             </TableCell>
                           )
@@ -599,30 +642,15 @@ export function FeesManager({ periods }: Props) {
                               c.component_code === `${prov.code}M` && c.category === cat
                           )
                           return (
-                            <TableCell key={cat} className="px-0.5 py-1 text-center">
-                              <Input
-                                type="text"
-                                inputMode="decimal"
-                                value={formatNumber(comp?.value)}
-                                onChange={(e) => {
-                                  const parsed = parseFormattedNumber(e.target.value)
-                                  updateComponent(`${prov.code}M`, cat, 'value', parsed)
-                                }}
-                                onFocus={(e) => {
-                                  if (comp?.value !== null && comp?.value !== undefined) {
-                                    e.target.value = String(comp.value)
-                                  }
-                                }}
-                                onBlur={(e) => {
-                                  const parsed = parseFormattedNumber(e.target.value)
-                                  updateComponent(`${prov.code}M`, cat, 'value', parsed)
-                                }}
-                                placeholder="0,00"
+                            <TableCell key={cat} className="px-0.5 py-1">
+                              <CurrencyInput
+                                value={comp?.value}
+                                onChange={(val) => updateComponent(`${prov.code}M`, cat, 'value', val)}
+                                disabled={!hasMunicipal}
                                 className={cn(
-                                  'w-24 text-right tabular-nums mx-auto',
+                                  'w-full text-right tabular-nums',
                                   !hasMunicipal && 'cursor-not-allowed'
                                 )}
-                                disabled={!hasMunicipal}
                               />
                             </TableCell>
                           )
