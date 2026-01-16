@@ -198,24 +198,31 @@ export function FeesManager({ periods }: Props) {
 
     setIsSaving(true)
     try {
-      // Filtrar solo componentes con valor válido (no null, no NaN)
-      // La BD tiene NOT NULL constraint en value
-      const componentsWithValues = components
-        .filter((c) => c.value !== null && !isNaN(c.value))
+      // Guardar componentes que:
+      // 1. Tienen valor ingresado, O
+      // 2. Tienen checkboxes activos (para preservar el estado aunque no haya valor)
+      // La BD tiene NOT NULL en value, usamos 0 como valor por defecto
+      const componentsToSave = components
+        .filter((c) => {
+          const hasValue = c.value !== null && !isNaN(c.value)
+          const hasCheckboxes = c.has_municipal || c.has_integrated_iibb
+          return hasValue || hasCheckboxes
+        })
         .map((c) => ({
           reca_id: selectedPeriodId,
           component_code: c.component_code,
           description: c.description,
           component_type: 'IBP',
           category: c.category,
-          value: c.value,
+          // Usar 0 si no hay valor pero hay checkboxes activos
+          value: c.value !== null && !isNaN(c.value) ? c.value : 0,
           province_code: c.province_code,
           has_municipal: c.has_municipal,
           has_integrated_iibb: c.has_integrated_iibb,
         }))
 
-      if (componentsWithValues.length === 0) {
-        toast.info('No hay componentes con valores para guardar')
+      if (componentsToSave.length === 0) {
+        toast.info('No hay componentes para guardar')
         setIsSaving(false)
         return
       }
@@ -224,15 +231,16 @@ export function FeesManager({ periods }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          components: componentsWithValues,
+          components: componentsToSave,
         }),
       })
 
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Error al guardar')
 
-      const tabName = activeTab === 'IBP' ? 'Provincial' : 'Municipal'
-      toast.success(`${componentsWithValues.length} componentes ${tabName} guardados`)
+      // Contar provincias únicas guardadas
+      const uniqueProvinces = new Set(componentsToSave.map(c => c.province_code)).size
+      toast.success(`Guardado: ${uniqueProvinces} provincias configuradas`)
       fetchComponents() // Reload
     } catch (error: any) {
       console.error('Error saving components:', error)

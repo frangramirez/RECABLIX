@@ -42,10 +42,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       )
     }
 
-    // Filtrar solo componentes con valor válido (validación defensiva)
-    // La BD tiene NOT NULL constraint en value
+    // Validación defensiva: filtrar componentes con value válido
+    // Frontend envía 0 para componentes sin valor pero con checkboxes activos
     const recordsToUpsert = components
-      .filter((c) => c.value !== null && c.value !== undefined)
+      .filter((c) => typeof c.value === 'number' && !isNaN(c.value))
       .map((c) => ({
         reca_id: c.reca_id,
         component_code: c.component_code,
@@ -54,13 +54,13 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         category: c.category,
         value: c.value,
         province_code: c.province_code,
-        has_municipal: c.has_municipal,
-        has_integrated_iibb: c.has_integrated_iibb,
+        has_municipal: c.has_municipal ?? false,
+        has_integrated_iibb: c.has_integrated_iibb ?? false,
       }))
 
     if (recordsToUpsert.length === 0) {
       return new Response(
-        JSON.stringify({ success: true, message: 'No hay componentes con valores para guardar', components: [] }),
+        JSON.stringify({ success: true, message: 'No hay componentes para guardar', components: [] }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
     }
