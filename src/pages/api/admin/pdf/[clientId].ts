@@ -2,7 +2,8 @@ import type { APIRoute } from 'astro'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { getStudioFromSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { config as appConfig, getTenantSchemaName } from '@/lib/config'
+import { config as appConfig } from '@/lib/config'
+import { ensureTenantSchema } from '@/lib/tenant'
 import {
   calculateRecategorization,
   type ClientData,
@@ -18,12 +19,13 @@ export const config = {
 
 /**
  * Helper para obtener el query builder correcto según el schema
+ * @param schemaName - Nombre del schema de tenant (ya validado/creado)
+ * @param table - Nombre de la tabla
  */
-function getQueryBuilder(studioId: string, table: string) {
+function getQueryBuilder(schemaName: string, table: string) {
   if (!supabaseAdmin) throw new Error('supabaseAdmin not configured')
 
   if (appConfig.USE_TENANT_SCHEMAS && appConfig.TENANT_TABLES.includes(table as any)) {
-    const schemaName = getTenantSchemaName(studioId)
     return supabaseAdmin.schema(schemaName).from(table)
   }
   return supabaseAdmin.from(table)
@@ -55,8 +57,11 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
     return new Response('studioId query param required', { status: 400 })
   }
 
+  // Asegurar que el tenant schema existe (fallback si el trigger falló)
+  const schemaName = await ensureTenantSchema(supabaseAdmin, studioId)
+
   // Obtener cliente con datos de reca usando tenant schema si está habilitado
-  const clientsQuery = getQueryBuilder(studioId, 'clients')
+  const clientsQuery = getQueryBuilder(schemaName, 'clients')
   const { data: clientWithData, error: clientError } = await clientsQuery
     .select(`
       id, name, cuit, studio_id,
@@ -106,7 +111,7 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
   }
 
   // Obtener transacciones del periodo (tabla reca_transactions - puede estar en tenant schema)
-  const txQuery = getQueryBuilder(studioId, 'reca_transactions')
+  const txQuery = getQueryBuilder(schemaName, 'reca_transactions')
   const { data: txData } = await txQuery
     .select('transaction_type, amount')
     .eq('client_id', clientId)

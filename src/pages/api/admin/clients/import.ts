@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro'
 import { getStudioFromSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
-import { getTenantSchemaName } from '@/lib/config'
+import { ensureTenantSchema } from '@/lib/tenant'
 
 interface ClientImportRow {
   name: string
@@ -66,8 +66,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       )
     }
 
-    // Obtener el nombre del schema del tenant
-    const schemaName = getTenantSchemaName(studioId)
+    // Obtener el nombre del schema del tenant (creándolo si no existe)
+    // Esto maneja el caso donde el trigger on_studio_created falló
+    const schemaName = await ensureTenantSchema(supabaseAdmin, studioId)
 
     let success = 0
     let errors: { row: number; error: string }[] = []

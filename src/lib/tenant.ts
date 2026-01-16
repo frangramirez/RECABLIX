@@ -155,3 +155,102 @@ export function queryTenant<T = any>(
 ) {
   return tenantFrom<T>(supabase, tenantSchema, table)
 }
+
+// ============================================================================
+// Schema Creation Utilities
+// ============================================================================
+
+import { getTenantSchemaName } from './config'
+
+/**
+ * Ensures a tenant schema exists for a given studio.
+ *
+ * This function implements a defensive pattern:
+ * 1. First checks if schema_name is already set in the studios table
+ * 2. If not, calls the create_reca_tenant RPC to create the schema
+ * 3. Updates the studios.schema_name field
+ *
+ * This is useful as a fallback when the on_studio_created trigger fails
+ * (e.g., due to RLS policy conflicts).
+ *
+ * @param supabaseAdmin - Admin client (bypasses RLS)
+ * @param studioId - UUID of the studio
+ * @returns The tenant schema name (e.g., 'tenant_xxx_xxx')
+ * @throws Error if schema creation fails with a non-ignorable error
+ *
+ * @example
+ * ```ts
+ * const schemaName = await ensureTenantSchema(supabaseAdmin, studioId)
+ * const { data } = await supabaseAdmin.schema(schemaName).from('clients').select('*')
+ * ```
+ */
+export async function ensureTenantSchema(
+  supabaseAdmin: SupabaseClient,
+  studioId: string
+): Promise<string> {
+  // 1. Check if schema_name is already set
+  const { data: studioRecord } = await supabaseAdmin
+    .from('studios')
+    .select('schema_name')
+    .eq('id', studioId)
+    .single()
+
+  // 2. If schema_name exists, return it
+  if (studioRecord?.schema_name) {
+    return studioRecord.schema_name
+  }
+
+  // 3. Generate expected schema name
+  const expectedSchema = getTenantSchemaName(studioId)
+
+  // 4. Try to create the tenant schema via RPC
+  const { error: createError } = await supabaseAdmin
+    .rpc('create_reca_tenant', { p_studio_id: studioId })
+
+  // Ignore "already exists" errors - they indicate the schema was created
+  // by another process (race condition) or a previous partial attempt
+  if (createError && !createError.message.includes('already exists')) {
+    console.error('[ensureTenantSchema] Error creating tenant schema:', createError)
+    throw new Error(`Error creating tenant schema: ${createError.message}`)
+  }
+
+  // 5. Update schema_name in studios table (defensive, RPC should do this too)
+  await supabaseAdmin
+    .from('studios')
+    .update({ schema_name: expectedSchema })
+    .eq('id', studioId)
+
+  console.log(`[ensureTenantSchema] Created/ensured schema: ${expectedSchema}`)
+
+  return expectedSchema
+}
+
+/**
+ * Gets the tenant schema name for a studio, creating it if necessary.
+ *
+ * Convenience wrapper around ensureTenantSchema that handles the common
+ * pattern of needing a schema name for queries.
+ *
+ * @param supabaseAdmin - Admin client (bypasses RLS)
+ * @param studioId - UUID of the studio
+ * @returns Object with schemaName and a flag indicating if it was created
+ */
+export async function getOrCreateTenantSchema(
+  supabaseAdmin: SupabaseClient,
+  studioId: string
+): Promise<{ schemaName: string; wasCreated: boolean }> {
+  // Check current state
+  const { data: studioRecord } = await supabaseAdmin
+    .from('studios')
+    .select('schema_name')
+    .eq('id', studioId)
+    .single()
+
+  const existed = !!studioRecord?.schema_name
+  const schemaName = await ensureTenantSchema(supabaseAdmin, studioId)
+
+  return {
+    schemaName,
+    wasCreated: !existed
+  }
+}
