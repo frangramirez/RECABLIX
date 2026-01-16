@@ -1,0 +1,73 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { supabaseAdmin } from '@/lib/supabase'
+import { OperationsManagerWithStudio } from '@/components/admin/OperationsManagerWithStudio'
+
+// Verificar que es superadmin
+const studio = Astro.locals.studio
+if (!studio?.is_superadmin) {
+  return Astro.redirect('/studio')
+}
+
+const { studioId } = Astro.params
+
+if (!studioId) {
+  return Astro.redirect('/admin/my-studios')
+}
+
+// Obtener datos del estudio y verificar acceso
+let studioData = null
+
+if (supabaseAdmin) {
+  // Verificar que el usuario es miembro de este estudio
+  const { data: membership } = await supabaseAdmin
+    .from('studio_members')
+    .select('role')
+    .eq('studio_id', studioId)
+    .eq('user_id', studio.user_id)
+    .single()
+
+  if (!membership || !['owner', 'admin'].includes(membership.role)) {
+    return Astro.redirect('/admin/my-studios')
+  }
+
+  // Obtener datos del estudio
+  const { data: studioRecord } = await supabaseAdmin
+    .from('studios')
+    .select('id, name, slug, schema_name')
+    .eq('id', studioId)
+    .single()
+
+  if (studioRecord) {
+    studioData = studioRecord
+  }
+}
+
+if (!studioData) {
+  return Astro.redirect('/admin/my-studios')
+}
+---
+
+<AdminLayout title={`Operaciones - ${studioData.name}`}>
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h1 class="text-2xl font-bold">Operaciones</h1>
+        <p class="text-muted-foreground text-sm">
+          Transacciones de <span class="font-medium">{studioData.name}</span>
+        </p>
+      </div>
+      <a
+        href={`/admin/my-studios/${studioId}`}
+        class="text-sm text-muted-foreground hover:text-foreground"
+      >
+        ← Volver al estudio
+      </a>
+    </div>
+    <OperationsManagerWithStudio
+      client:load
+      studioId={studioData.id}
+      schemaName={studioData.schema_name}
+    />
+  </div>
+</AdminLayout>

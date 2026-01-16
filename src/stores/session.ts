@@ -1,5 +1,24 @@
 import { atom } from 'nanostores'
 
+/**
+ * Estudio donde el superadmin es miembro (para navegación Mis Estudios)
+ */
+export interface MyStudio {
+  id: string
+  name: string
+  slug: string
+  role: 'owner' | 'admin'
+}
+
+/**
+ * Store para cachear la lista de estudios del superadmin
+ */
+export const $myStudios = atom<MyStudio[]>([])
+
+export function setMyStudios(studios: MyStudio[]) {
+  $myStudios.set(studios)
+}
+
 export interface UserPermissions {
   can_view_billing: boolean
   can_manage_subscriptions: boolean

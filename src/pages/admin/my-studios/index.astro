@@ -1,0 +1,14 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { MyStudiosManager } from '@/components/admin/MyStudiosManager'
+
+// Verificar que es superadmin
+const studio = Astro.locals.studio
+if (!studio?.is_superadmin) {
+  return Astro.redirect('/studio')
+}
+---
+
+<AdminLayout title="Mis Estudios">
+  <MyStudiosManager client:load />
+</AdminLayout>
