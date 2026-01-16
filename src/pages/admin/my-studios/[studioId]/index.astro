@@ -1,0 +1,72 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { supabaseAdmin } from '@/lib/supabase'
+import { StudioOverview } from '@/components/admin/StudioOverview'
+
+// Verificar que es superadmin
+const studio = Astro.locals.studio
+if (!studio?.is_superadmin) {
+  return Astro.redirect('/studio')
+}
+
+const { studioId } = Astro.params
+
+if (!studioId) {
+  return Astro.redirect('/admin/my-studios')
+}
+
+// Obtener datos del estudio
+let studioData = null
+let memberCount = 0
+let clientCount = 0
+
+if (supabaseAdmin) {
+  // Verificar que el usuario es miembro de este estudio
+  const { data: membership } = await supabaseAdmin
+    .from('studio_members')
+    .select('role')
+    .eq('studio_id', studioId)
+    .eq('user_id', studio.user_id)
+    .single()
+
+  if (!membership || !['owner', 'admin'].includes(membership.role)) {
+    return Astro.redirect('/admin/my-studios')
+  }
+
+  // Obtener datos del estudio
+  const { data: studioRecord } = await supabaseAdmin
+    .from('studios')
+    .select('id, name, slug, schema_name, created_at')
+    .eq('id', studioId)
+    .single()
+
+  if (studioRecord) {
+    studioData = { ...studioRecord, role: membership.role }
+
+    // Contar miembros
+    const { count: members } = await supabaseAdmin
+      .from('studio_members')
+      .select('id', { count: 'exact', head: true })
+      .eq('studio_id', studioId)
+
+    memberCount = members || 0
+  }
+}
+
+if (!studioData) {
+  return Astro.redirect('/admin/my-studios')
+}
+---
+
+<AdminLayout title={studioData.name}>
+  <StudioOverview
+    client:load
+    studioId={studioData.id}
+    studioName={studioData.name}
+    studioSlug={studioData.slug}
+    schemaName={studioData.schema_name}
+    role={studioData.role}
+    memberCount={memberCount}
+    createdAt={studioData.created_at}
+  />
+</AdminLayout>

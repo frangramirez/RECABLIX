@@ -1,12 +1,11 @@
 /**
- * MembersManager - Gestión de Miembros del Studio
+ * MembersManagerWithStudio - Gestión de Miembros del Studio (con studioId explícito)
  *
- * Permite a owners/admins gestionar miembros y sus permisos
+ * Versión del MembersManager que acepta studioId como prop
+ * para usar en /admin/my-studios/[studioId]/members
  */
 
 import { useState, useEffect } from 'react'
-import { useStore } from '@nanostores/react'
-import { $session } from '@/stores/session'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -35,7 +34,7 @@ import {
 } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
-import { Pencil, Trash2, Shield, UserPlus, Loader2 } from 'lucide-react'
+import { Pencil, Trash2, Shield, UserPlus, RefreshCw, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface Member {
@@ -101,8 +100,12 @@ const PERMISSION_CONFIGS: PermissionConfig[] = [
   },
 ]
 
-export function MembersManager() {
-  const { studio, role, is_superadmin, permissions } = useStore($session)
+interface Props {
+  studioId: string
+  studioName: string
+}
+
+export function MembersManagerWithStudio({ studioId, studioName }: Props) {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [editingMember, setEditingMember] = useState<Member | null>(null)
@@ -115,18 +118,16 @@ export function MembersManager() {
   const [inviteRole, setInviteRole] = useState<'admin' | 'collaborator' | 'client'>('collaborator')
   const [inviting, setInviting] = useState(false)
 
-  const canManageMembers = is_superadmin || role === 'owner' || role === 'admin'
-
   useEffect(() => {
-    fetchMembers()
-  }, [studio?.id])
+    if (studioId) {
+      fetchMembers()
+    }
+  }, [studioId])
 
   const fetchMembers = async () => {
-    if (!studio?.id) return
-
     try {
       setLoading(true)
-      const response = await fetch(`/api/studio/members?studio_id=${studio.id}`)
+      const response = await fetch(`/api/studio/members?studio_id=${studioId}`)
       const data = await response.json()
 
       if (data.error) {
@@ -144,15 +145,11 @@ export function MembersManager() {
   }
 
   const openEditDialog = (member: Member) => {
-    // Owner y superadmin pueden editar todos
-    // Admin solo puede editar collaborator y client
-    const canEdit =
-      is_superadmin ||
-      role === 'owner' ||
-      (role === 'admin' && ['collaborator', 'client'].includes(member.role))
+    // Solo owners/admins pueden editar, y solo a roles inferiores
+    const canEdit = ['collaborator', 'client'].includes(member.role)
 
-    if (!canEdit) {
-      toast.error('No tienes permiso para editar este miembro')
+    if (!canEdit && member.role !== 'admin') {
+      toast.error('No se pueden editar los permisos del propietario')
       return
     }
 
@@ -200,11 +197,6 @@ export function MembersManager() {
   const handleDeleteMember = async (memberId: string) => {
     if (!confirm('¿Estás seguro de eliminar este miembro?')) return
 
-    if (!permissions?.can_delete_members && !is_superadmin && role !== 'owner') {
-      toast.error('No tienes permiso para eliminar miembros')
-      return
-    }
-
     try {
       const response = await fetch(`/api/studio/members/${memberId}`, {
         method: 'DELETE',
@@ -226,11 +218,6 @@ export function MembersManager() {
   }
 
   const handleInviteMember = async () => {
-    if (!studio?.id) {
-      toast.error('Error: No se pudo identificar el estudio')
-      return
-    }
-
     if (!inviteEmail.trim()) {
       toast.error('Ingrese un email válido')
       return
@@ -249,7 +236,7 @@ export function MembersManager() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studio_id: studio.id,
+          studio_id: studioId,
           email: inviteEmail.trim().toLowerCase(),
           role: inviteRole,
         }),
@@ -311,32 +298,26 @@ export function MembersManager() {
     }
   }
 
-  if (!canManageMembers) {
+  if (loading) {
     return (
-      <div className="p-6 text-center">
-        <Shield className="h-12 w-12 mx-auto text-gray-400 mb-3" />
-        <p className="text-gray-600">No tienes permiso para gestionar miembros</p>
+      <div className="flex items-center justify-center py-12">
+        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+        <span className="ml-3 text-muted-foreground">Cargando miembros...</span>
       </div>
     )
-  }
-
-  if (loading) {
-    return <div className="p-6 text-center">Cargando miembros...</div>
   }
 
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold">Miembros del Studio</h2>
-        {(is_superadmin || role === 'owner') && (
-          <Button onClick={openInviteDialog}>
-            <UserPlus className="h-4 w-4 mr-2" />
-            Invitar Miembro
-          </Button>
-        )}
+        <h2 className="text-lg font-semibold">Miembros de {studioName}</h2>
+        <Button onClick={openInviteDialog}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Invitar Miembro
+        </Button>
       </div>
 
-      <div className="border rounded-lg">
+      <div className="border rounded-lg bg-card">
         <Table>
           <TableHeader>
             <TableRow>
@@ -388,17 +369,13 @@ export function MembersManager() {
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          {(permissions?.can_delete_members ||
-                            is_superadmin ||
-                            role === 'owner') && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteMember(member.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
-                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteMember(member.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-600" />
+                          </Button>
                         </>
                       )}
                     </TableCell>
