@@ -56,7 +56,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           has_municipal: c.has_municipal,
           has_integrated_iibb: c.has_integrated_iibb,
         }
-        if (c.id) record.id = c.id
+        // Solo incluir id si es un UUID válido (no undefined, null, o string vacío)
+        if (c.id && typeof c.id === 'string' && c.id.length > 0) {
+          record.id = c.id
+        }
         return record
       }),
       {

@@ -203,18 +203,22 @@ export function FeesManager({ periods }: Props) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          components: components.map((c) => ({
-            id: c.id,
-            reca_id: selectedPeriodId,
-            component_code: c.component_code,
-            description: c.description,
-            component_type: 'IBP', // Siempre IBP (provincial o municipal)
-            category: c.category,
-            value: c.value,
-            province_code: c.province_code,
-            has_municipal: c.has_municipal,
-            has_integrated_iibb: c.has_integrated_iibb,
-          })),
+          components: components.map((c) => {
+            const comp: Record<string, unknown> = {
+              reca_id: selectedPeriodId,
+              component_code: c.component_code,
+              description: c.description,
+              component_type: 'IBP',
+              category: c.category,
+              value: c.value,
+              province_code: c.province_code,
+              has_municipal: c.has_municipal,
+              has_integrated_iibb: c.has_integrated_iibb,
+            }
+            // Solo incluir id si existe (evita null constraint en el upsert)
+            if (c.id) comp.id = c.id
+            return comp
+          }),
         }),
       })
 
