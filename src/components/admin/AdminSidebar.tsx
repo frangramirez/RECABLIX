@@ -19,7 +19,7 @@ const adminNavigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { name: 'Períodos', href: '/admin/periods', icon: Calendar },
   { name: 'Escalas', href: '/admin/scales', icon: Scale },
-  { name: 'Componentes Cuota', href: '/admin/fees', icon: Receipt },
+  { name: 'Componente Provincial', href: '/admin/fees', icon: Receipt },
   { name: 'Estudios', href: '/admin/studios', icon: Building2 },
   { name: 'Clientes', href: '/admin/clients', icon: Users },
   { name: 'Import/Export', href: '/admin/import-export', icon: FileSpreadsheet },

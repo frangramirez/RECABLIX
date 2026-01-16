@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/table'
 import { Save, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import * as XLSX from 'xlsx'
 
 interface Period {
@@ -82,11 +83,11 @@ interface Props {
   periods: Period[]
 }
 
-type ComponentType = 'IMP' | 'JUB' | 'OS' | 'IBP'
+type ComponentType = 'IBP' | 'IBP_MUN'
 
 export function FeesManager({ periods }: Props) {
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>('')
-  const [activeTab, setActiveTab] = useState<ComponentType>('IMP')
+  const [activeTab, setActiveTab] = useState<ComponentType>('IBP')
   const [components, setComponents] = useState<FeeComponent[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -109,15 +110,16 @@ export function FeesManager({ periods }: Props) {
 
     setIsLoading(true)
     try {
+      // Fetch TODOS los componentes IBP (provincial + municipal)
+      // Los filtraremos en la UI según el tab activo
       const { data, error } = await supabase
         .from('reca_fee_components')
         .select('*')
         .eq('reca_id', selectedPeriodId)
-        .eq('component_type', activeTab)
+        .eq('component_type', 'IBP')
 
       if (error) throw error
 
-      // Si no existen, crear plantilla vacía según tipo
       if (!data || data.length === 0) {
         setComponents(createEmptyComponents())
       } else {
@@ -134,7 +136,7 @@ export function FeesManager({ periods }: Props) {
   function createEmptyComponents(): FeeComponent[] {
     const baseComponent = {
       reca_id: selectedPeriodId,
-      component_type: activeTab,
+      component_type: 'IBP' as const,
       description: null,
       value: null,
       province_code: null,
@@ -142,56 +144,28 @@ export function FeesManager({ periods }: Props) {
       has_integrated_iibb: false,
     }
 
-    switch (activeTab) {
-      case 'IMP':
-        return CATEGORIES.flatMap((cat) => [
-          {
-            ...baseComponent,
-            component_code: 'B20',
-            category: cat,
-            description: 'Impositivo Bienes',
-          },
-          {
-            ...baseComponent,
-            component_code: 'S20',
-            category: cat,
-            description: 'Impositivo Servicios',
-          },
-        ])
-      case 'JUB':
-        return CATEGORIES.flatMap((cat) => [
-          {
-            ...baseComponent,
-            component_code: '021',
-            category: cat,
-            description: 'Jubilatorio Aportes',
-          },
-          {
-            ...baseComponent,
-            component_code: '21J',
-            category: cat,
-            description: 'Jubilatorio Mínimo',
-          },
-        ])
-      case 'OS':
-        return CATEGORIES.map((cat) => ({
+    if (activeTab === 'IBP') {
+      // Provincial: códigos 901-924
+      return PROVINCES.flatMap((prov) =>
+        CATEGORIES.map((cat) => ({
           ...baseComponent,
-          component_code: '024',
+          component_code: prov.code,
           category: cat,
-          description: 'Obra Social',
+          description: prov.name,
+          province_code: prov.code,
         }))
-      case 'IBP':
-        return PROVINCES.flatMap((prov) =>
-          CATEGORIES.map((cat) => ({
-            ...baseComponent,
-            component_code: prov.code,
-            category: cat,
-            description: prov.name,
-            province_code: prov.code,
-          }))
-        )
-      default:
-        return []
+      )
+    } else {
+      // Municipal: códigos 901M-924M (solo para provincias con municipal)
+      return PROVINCES.flatMap((prov) =>
+        CATEGORIES.map((cat) => ({
+          ...baseComponent,
+          component_code: `${prov.code}M`,
+          category: cat,
+          description: `${prov.name} Municipal`,
+          province_code: prov.code,
+        }))
+      )
     }
   }
 
@@ -224,11 +198,12 @@ export function FeesManager({ periods }: Props) {
             reca_id: selectedPeriodId,
             component_code: c.component_code,
             description: c.description,
-            component_type: activeTab,
+            component_type: 'IBP', // Siempre IBP (provincial o municipal)
             category: c.category,
             value: c.value,
             province_code: c.province_code,
             has_municipal: c.has_municipal,
+            has_integrated_iibb: c.has_integrated_iibb,
           })),
         }),
       })
@@ -236,7 +211,8 @@ export function FeesManager({ periods }: Props) {
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Error al guardar')
 
-      toast.success(`Componentes ${activeTab} guardados correctamente`)
+      const tabName = activeTab === 'IBP' ? 'Provincial' : 'Municipal'
+      toast.success(`Componentes ${tabName} guardados correctamente`)
       fetchComponents() // Reload
     } catch (error: any) {
       console.error('Error saving components:', error)
@@ -248,123 +224,50 @@ export function FeesManager({ periods }: Props) {
 
   function handleExportTab() {
     const selectedPeriod = periods.find(p => p.id === selectedPeriodId)
-    const periodCode = selectedPeriod?.code || 'cuotas'
+    const periodCode = selectedPeriod?.code || 'iibb'
 
     let exportData: Record<string, any>[] = []
     let sheetName = ''
+    let filename = ''
 
-    switch (activeTab) {
-      case 'IMP':
-        sheetName = 'Impositivo'
-        exportData = CATEGORIES.map(cat => {
-          const b20 = components.find(c => c.category === cat && c.component_code === 'B20')
-          const s20 = components.find(c => c.category === cat && c.component_code === 'S20')
-          return {
-            'Categoría': cat,
-            'B20 (Bienes)': b20?.value || '',
-            'S20 (Servicios)': s20?.value || '',
-          }
+    if (activeTab === 'IBP') {
+      sheetName = 'IIBB Provincial'
+      filename = `iibb_provincial_${periodCode}.xlsx`
+      exportData = PROVINCES.map(prov => {
+        const row: Record<string, any> = { 'Provincia': prov.name, 'Código': prov.code }
+        CATEGORIES.forEach(cat => {
+          const comp = components.find(c => c.component_code === prov.code && c.category === cat)
+          row[`Cat ${cat}`] = comp?.value || ''
         })
-        break
-      case 'JUB':
-        sheetName = 'Jubilatorio'
-        exportData = CATEGORIES.map(cat => {
-          const c021 = components.find(c => c.category === cat && c.component_code === '021')
-          const c21j = components.find(c => c.category === cat && c.component_code === '21J')
-          return {
-            'Categoría': cat,
-            '021 (Aportes)': c021?.value || '',
-            '21J (Mínimo Jubilado)': c21j?.value || '',
-          }
+        const firstComp = components.find(c => c.component_code === prov.code && c.category === 'A')
+        row['Municipal'] = firstComp?.has_municipal ? 'Sí' : 'No'
+        row['IIBB Integrado'] = firstComp?.has_integrated_iibb ? 'Sí' : 'No'
+        return row
+      })
+    } else {
+      // IBP_MUN
+      sheetName = 'IIBB Municipal'
+      filename = `iibb_municipal_${periodCode}.xlsx`
+      // Solo provincias con has_municipal=true
+      const provincesWithMunicipal = PROVINCES.filter(prov => {
+        const provincialComp = components.find(c => c.component_code === prov.code && c.category === 'A')
+        return provincialComp?.has_municipal ?? false
+      })
+      exportData = provincesWithMunicipal.map(prov => {
+        const row: Record<string, any> = { 'Provincia': prov.name, 'Código': `${prov.code}M` }
+        CATEGORIES.forEach(cat => {
+          const comp = components.find(c => c.component_code === `${prov.code}M` && c.category === cat)
+          row[`Cat ${cat}`] = comp?.value || ''
         })
-        break
-      case 'OS':
-        sheetName = 'ObraSocial'
-        exportData = CATEGORIES.map(cat => {
-          const c024 = components.find(c => c.category === cat && c.component_code === '024')
-          return {
-            'Categoría': cat,
-            '024 (Obra Social)': c024?.value || '',
-          }
-        })
-        break
-      case 'IBP':
-        sheetName = 'IIBB'
-        exportData = PROVINCES.map(prov => {
-          const row: Record<string, any> = { 'Provincia': prov.name, 'Código': prov.code }
-          CATEGORIES.forEach(cat => {
-            const comp = components.find(c => c.component_code === prov.code && c.category === cat)
-            row[`Cat ${cat}`] = comp?.value || ''
-          })
-          const firstComp = components.find(c => c.component_code === prov.code)
-          row['Municipal'] = firstComp?.has_municipal ? 'Sí' : 'No'
-          return row
-        })
-        break
+        return row
+      })
     }
 
     const ws = XLSX.utils.json_to_sheet(exportData)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, sheetName)
-    XLSX.writeFile(wb, `cuotas_${activeTab}_${periodCode}.xlsx`)
-    toast.success(`Tab ${activeTab} exportado correctamente`)
-  }
-
-  async function handleExportAll() {
-    const selectedPeriod = periods.find(p => p.id === selectedPeriodId)
-    const periodCode = selectedPeriod?.code || 'cuotas'
-
-    // Fetch all components for this period
-    const { data: allComponents, error } = await supabase
-      .from('reca_fee_components')
-      .select('*')
-      .eq('reca_id', selectedPeriodId)
-
-    if (error) {
-      toast.error('Error al obtener datos')
-      return
-    }
-
-    const wb = XLSX.utils.book_new()
-
-    // IMP sheet
-    const impData = CATEGORIES.map(cat => {
-      const b20 = allComponents?.find(c => c.category === cat && c.component_code === 'B20')
-      const s20 = allComponents?.find(c => c.category === cat && c.component_code === 'S20')
-      return { 'Categoría': cat, 'B20 (Bienes)': b20?.value || '', 'S20 (Servicios)': s20?.value || '' }
-    })
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(impData), 'Impositivo')
-
-    // JUB sheet
-    const jubData = CATEGORIES.map(cat => {
-      const c021 = allComponents?.find(c => c.category === cat && c.component_code === '021')
-      const c21j = allComponents?.find(c => c.category === cat && c.component_code === '21J')
-      return { 'Categoría': cat, '021 (Aportes)': c021?.value || '', '21J (Mínimo Jubilado)': c21j?.value || '' }
-    })
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(jubData), 'Jubilatorio')
-
-    // OS sheet
-    const osData = CATEGORIES.map(cat => {
-      const c024 = allComponents?.find(c => c.category === cat && c.component_code === '024')
-      return { 'Categoría': cat, '024 (Obra Social)': c024?.value || '' }
-    })
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(osData), 'ObraSocial')
-
-    // IBP sheet
-    const ibpData = PROVINCES.map(prov => {
-      const row: Record<string, any> = { 'Provincia': prov.name, 'Código': prov.code }
-      CATEGORIES.forEach(cat => {
-        const comp = allComponents?.find(c => c.component_code === prov.code && c.category === cat)
-        row[`Cat ${cat}`] = comp?.value || ''
-      })
-      const firstComp = allComponents?.find(c => c.component_code === prov.code)
-      row['Municipal'] = firstComp?.has_municipal ? 'Sí' : 'No'
-      return row
-    })
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ibpData), 'IIBB')
-
-    XLSX.writeFile(wb, `cuotas_completo_${periodCode}.xlsx`)
-    toast.success('Archivo completo exportado')
+    XLSX.writeFile(wb, filename)
+    toast.success(`Tab ${sheetName} exportado correctamente`)
   }
 
   function handleImportTab(event: React.ChangeEvent<HTMLInputElement>) {
@@ -384,44 +287,41 @@ export function FeesManager({ periods }: Props) {
         const updates: Partial<FeeComponent>[] = []
 
         jsonData.forEach((row: any, index: number) => {
-          const category = String(row['Categoría'] || row['Categoria'] || '').toUpperCase().trim()
+          const provCode = String(row['Código'] || row['Codigo'] || '').trim()
 
-          if (activeTab !== 'IBP' && !CATEGORIES.includes(category)) {
-            errors.push(`Fila ${index + 2}: Categoría "${category}" inválida`)
+          if (!provCode) {
+            errors.push(`Fila ${index + 2}: Código de provincia faltante`)
             return
           }
 
-          switch (activeTab) {
-            case 'IMP': {
-              const b20Val = parseFloat(row['B20 (Bienes)'] || '')
-              const s20Val = parseFloat(row['S20 (Servicios)'] || '')
-              if (!isNaN(b20Val)) updates.push({ component_code: 'B20', category, value: b20Val })
-              if (!isNaN(s20Val)) updates.push({ component_code: 'S20', category, value: s20Val })
-              break
-            }
-            case 'JUB': {
-              const c021Val = parseFloat(row['021 (Aportes)'] || '')
-              const c21jVal = parseFloat(row['21J (Mínimo Jubilado)'] || '')
-              if (!isNaN(c021Val)) updates.push({ component_code: '021', category, value: c021Val })
-              if (!isNaN(c21jVal)) updates.push({ component_code: '21J', category, value: c21jVal })
-              break
-            }
-            case 'OS': {
-              const c024Val = parseFloat(row['024 (Obra Social)'] || '')
-              if (!isNaN(c024Val)) updates.push({ component_code: '024', category, value: c024Val })
-              break
-            }
-            case 'IBP': {
-              const provCode = String(row['Código'] || row['Codigo'] || '')
-              const hasMunicipal = row['Municipal'] === 'Sí' || row['Municipal'] === 'Si' || row['Municipal'] === true
-              CATEGORIES.forEach(cat => {
-                const val = parseFloat(row[`Cat ${cat}`] || '')
-                if (!isNaN(val)) {
-                  updates.push({ component_code: provCode, category: cat, value: val, has_municipal: hasMunicipal })
-                }
-              })
-              break
-            }
+          if (activeTab === 'IBP') {
+            // Provincial: códigos 901-924
+            const hasMunicipal = row['Municipal'] === 'Sí' || row['Municipal'] === 'Si' || row['Municipal'] === true
+            const hasIntegrated = row['IIBB Integrado'] === 'Sí' || row['IIBB Integrado'] === 'Si' || row['IIBB Integrado'] === true
+            CATEGORIES.forEach(cat => {
+              const val = parseFloat(row[`Cat ${cat}`] || '')
+              if (!isNaN(val)) {
+                updates.push({
+                  component_code: provCode,
+                  category: cat,
+                  value: val,
+                  has_municipal: hasMunicipal,
+                  has_integrated_iibb: hasIntegrated
+                })
+              }
+            })
+          } else {
+            // IBP_MUN: códigos municipales (ej: 902M)
+            CATEGORIES.forEach(cat => {
+              const val = parseFloat(row[`Cat ${cat}`] || '')
+              if (!isNaN(val)) {
+                updates.push({
+                  component_code: provCode,
+                  category: cat,
+                  value: val
+                })
+              }
+            })
           }
         })
 
@@ -485,7 +385,7 @@ export function FeesManager({ periods }: Props) {
         <div className="flex items-center gap-2">
           <Button onClick={handleSave} disabled={isSaving}>
             <Save className="h-4 w-4 mr-2" />
-            Guardar {activeTab}
+            Guardar
           </Button>
 
           <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
@@ -504,182 +404,16 @@ export function FeesManager({ periods }: Props) {
             <Download className="h-4 w-4 mr-2" />
             Exportar Tab
           </Button>
-
-          <Button variant="outline" onClick={handleExportAll}>
-            <Download className="h-4 w-4 mr-2" />
-            Exportar Todo
-          </Button>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as ComponentType)}>
         <TabsList>
-          <TabsTrigger value="IMP">Impositivo</TabsTrigger>
-          <TabsTrigger value="JUB">Jubilatorio</TabsTrigger>
-          <TabsTrigger value="OS">Obra Social</TabsTrigger>
-          <TabsTrigger value="IBP">Ingresos Brutos</TabsTrigger>
+          <TabsTrigger value="IBP">Ingresos Brutos Provincial</TabsTrigger>
+          <TabsTrigger value="IBP_MUN">Ingresos Brutos Municipal</TabsTrigger>
         </TabsList>
 
-        {/* Tab IMP */}
-        <TabsContent value="IMP">
-          {isLoading ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Cargando...</p>
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">Cat</TableHead>
-                    <TableHead>B20 (Bienes)</TableHead>
-                    <TableHead>S20 (Servicios)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {CATEGORIES.map((cat) => {
-                    const b20 = components.find(
-                      (c) => c.category === cat && c.component_code === 'B20'
-                    )
-                    const s20 = components.find(
-                      (c) => c.category === cat && c.component_code === 'S20'
-                    )
-                    return (
-                      <TableRow key={cat}>
-                        <TableCell className="font-bold">{cat}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={b20?.value || ''}
-                            onChange={(e) =>
-                              updateComponent('B20', cat, 'value', parseFloat(e.target.value) || null)
-                            }
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={s20?.value || ''}
-                            onChange={(e) =>
-                              updateComponent('S20', cat, 'value', parseFloat(e.target.value) || null)
-                            }
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Tab JUB */}
-        <TabsContent value="JUB">
-          {isLoading ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Cargando...</p>
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">Cat</TableHead>
-                    <TableHead>021 (Aportes)</TableHead>
-                    <TableHead>21J (Mínimo Jubilado)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {CATEGORIES.map((cat) => {
-                    const c021 = components.find(
-                      (c) => c.category === cat && c.component_code === '021'
-                    )
-                    const c21j = components.find(
-                      (c) => c.category === cat && c.component_code === '21J'
-                    )
-                    return (
-                      <TableRow key={cat}>
-                        <TableCell className="font-bold">{cat}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={c021?.value || ''}
-                            onChange={(e) =>
-                              updateComponent('021', cat, 'value', parseFloat(e.target.value) || null)
-                            }
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={c21j?.value || ''}
-                            onChange={(e) =>
-                              updateComponent('21J', cat, 'value', parseFloat(e.target.value) || null)
-                            }
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Tab OS */}
-        <TabsContent value="OS">
-          {isLoading ? (
-            <div className="text-center py-8">
-              <p className="text-muted-foreground">Cargando...</p>
-            </div>
-          ) : (
-            <div className="border rounded-lg overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-16">Cat</TableHead>
-                    <TableHead>024 (Obra Social Base)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {CATEGORIES.map((cat) => {
-                    const c024 = components.find(
-                      (c) => c.category === cat && c.component_code === '024'
-                    )
-                    return (
-                      <TableRow key={cat}>
-                        <TableCell className="font-bold">{cat}</TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            value={c024?.value || ''}
-                            onChange={(e) =>
-                              updateComponent('024', cat, 'value', parseFloat(e.target.value) || null)
-                            }
-                            placeholder="0.00"
-                          />
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </TabsContent>
-
-        {/* Tab IBP */}
+        {/* Tab IBP Provincial */}
         <TabsContent value="IBP">
           {isLoading ? (
             <div className="text-center py-8">
@@ -701,13 +435,117 @@ export function FeesManager({ periods }: Props) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {PROVINCES.map((prov) => (
+                  {PROVINCES.map((prov) => {
+                    const firstComp = components.find(
+                      (c) => c.component_code === prov.code && c.category === 'A'
+                    )
+                    const hasIntegrated = firstComp?.has_integrated_iibb ?? false
+
+                    return (
+                      <TableRow
+                        key={prov.code}
+                        className={cn(!hasIntegrated && 'bg-muted/30 opacity-60')}
+                      >
+                        <TableCell className="font-medium">{prov.name}</TableCell>
+                        {CATEGORIES.map((cat) => {
+                          const comp = components.find(
+                            (c) =>
+                              c.component_code === prov.code && c.category === cat
+                          )
+                          return (
+                            <TableCell key={cat}>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={comp?.value || ''}
+                                onChange={(e) =>
+                                  updateComponent(
+                                    prov.code,
+                                    cat,
+                                    'value',
+                                    parseFloat(e.target.value) || null
+                                  )
+                                }
+                                placeholder="0.00"
+                                className={cn('w-20', !hasIntegrated && 'cursor-not-allowed')}
+                                disabled={!hasIntegrated}
+                              />
+                            </TableCell>
+                          )
+                        })}
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={firstComp?.has_municipal || false}
+                            onCheckedChange={(checked: boolean) => {
+                              // Aplicar a todas las categorías de la provincia
+                              setComponents((prev) =>
+                                prev.map((c) =>
+                                  c.component_code === prov.code
+                                    ? { ...c, has_municipal: !!checked }
+                                    : c
+                                )
+                              )
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Checkbox
+                            checked={hasIntegrated}
+                            onCheckedChange={(checked: boolean) => {
+                              // Aplicar a todas las categorías de la provincia
+                              setComponents((prev) =>
+                                prev.map((c) =>
+                                  c.component_code === prov.code
+                                    ? { ...c, has_integrated_iibb: !!checked }
+                                    : c
+                                )
+                              )
+                            }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Tab IBP Municipal */}
+        <TabsContent value="IBP_MUN">
+          {isLoading ? (
+            <div className="text-center py-8">
+              <p className="text-muted-foreground">Cargando...</p>
+            </div>
+          ) : (
+            <div className="border rounded-lg overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-32">Provincia</TableHead>
+                    {CATEGORIES.map((cat) => (
+                      <TableHead key={cat} className="text-center w-24">
+                        {cat}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {PROVINCES.filter((prov) => {
+                    // Filtrar solo provincias con has_municipal=true
+                    // Buscar en el componente provincial (sin M) de categoría A
+                    const provincialComp = components.find(
+                      (c) => c.component_code === prov.code && c.category === 'A'
+                    )
+                    return provincialComp?.has_municipal ?? false
+                  }).map((prov) => (
                     <TableRow key={prov.code}>
                       <TableCell className="font-medium">{prov.name}</TableCell>
                       {CATEGORIES.map((cat) => {
                         const comp = components.find(
                           (c) =>
-                            c.component_code === prov.code && c.category === cat
+                            c.component_code === `${prov.code}M` && c.category === cat
                         )
                         return (
                           <TableCell key={cat}>
@@ -717,7 +555,7 @@ export function FeesManager({ periods }: Props) {
                               value={comp?.value || ''}
                               onChange={(e) =>
                                 updateComponent(
-                                  prov.code,
+                                  `${prov.code}M`,
                                   cat,
                                   'value',
                                   parseFloat(e.target.value) || null
@@ -729,44 +567,6 @@ export function FeesManager({ periods }: Props) {
                           </TableCell>
                         )
                       })}
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={
-                            components.find(
-                              (c) => c.component_code === prov.code && c.category === 'A'
-                            )?.has_municipal || false
-                          }
-                          onCheckedChange={(checked: boolean) => {
-                            // Aplicar a todas las categorías de la provincia
-                            setComponents((prev) =>
-                              prev.map((c) =>
-                                c.component_code === prov.code
-                                  ? { ...c, has_municipal: !!checked }
-                                  : c
-                              )
-                            )
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Checkbox
-                          checked={
-                            components.find(
-                              (c) => c.component_code === prov.code && c.category === 'A'
-                            )?.has_integrated_iibb || false
-                          }
-                          onCheckedChange={(checked: boolean) => {
-                            // Aplicar a todas las categorías de la provincia
-                            setComponents((prev) =>
-                              prev.map((c) =>
-                                c.component_code === prov.code
-                                  ? { ...c, has_integrated_iibb: !!checked }
-                                  : c
-                              )
-                            )
-                          }}
-                        />
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
