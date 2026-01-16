@@ -1,6 +1,7 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getTenantSchemaName } from '@/lib/config'
 import { ClientsTableWithStudio } from '@/components/admin/ClientsTableWithStudio'
 
 // Verificar que es superadmin
@@ -39,7 +40,11 @@ if (supabaseAdmin) {
     .single()
 
   if (studioRecord) {
-    studioData = studioRecord
+    studioData = {
+      ...studioRecord,
+      // Fallback: generar schema_name si es null
+      schema_name: studioRecord.schema_name || getTenantSchemaName(studioRecord.id)
+    }
   }
 }
 

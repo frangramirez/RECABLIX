@@ -1,6 +1,7 @@
 ---
 import AdminLayout from '@/layouts/AdminLayout.astro'
 import { supabaseAdmin } from '@/lib/supabase'
+import { getTenantSchemaName } from '@/lib/config'
 import { StudioOverview } from '@/components/admin/StudioOverview'
 
 // Verificar que es superadmin
@@ -41,7 +42,12 @@ if (supabaseAdmin) {
     .single()
 
   if (studioRecord) {
-    studioData = { ...studioRecord, role: membership.role }
+    studioData = {
+      ...studioRecord,
+      role: membership.role,
+      // Fallback: generar schema_name si es null
+      schema_name: studioRecord.schema_name || getTenantSchemaName(studioRecord.id)
+    }
 
     // Contar miembros
     const { count: members } = await supabaseAdmin
