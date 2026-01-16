@@ -6,8 +6,8 @@ interface ContablixIconProps {
 }
 
 /**
- * Isotipo CX de Contablix
- * Uso: Sidebars, headers compactos, favicon inline
+ * Isotipo CX de Contablix (solo el símbolo)
+ * Uso: Favicon inline, espacios muy reducidos
  */
 export function ContablixIcon({ className, size = 32 }: ContablixIconProps) {
   return (
@@ -20,17 +20,14 @@ export function ContablixIcon({ className, size = 32 }: ContablixIconProps) {
       className={cn('shrink-0', className)}
       aria-label="Contablix"
     >
-      {/* C ovalada */}
       <path
         d="M12 32c0-11 8-20 19-20 5 0 9 1.5 12 4l-6.5 8c-1.5-1.5-3.5-2.5-5.5-2.5-6 0-9 4.5-9 10.5s3 10.5 9 10.5c2 0 4-1 5.5-2.5l6.5 8c-3 2.5-7 4-12 4-11 0-19-9-19-20z"
         fill="#14315d"
       />
-      {/* X */}
       <path
         d="M32 24l7-10h10l-12 16 12 16h-10l-7-10-7 10h-10l12-16-12-16h10l7 10z"
         fill="#14315d"
       />
-      {/* Acento verde */}
       <polygon points="44,14 56,14 52,20 40,20" fill="#00b67a" />
     </svg>
   )
@@ -39,91 +36,91 @@ export function ContablixIcon({ className, size = 32 }: ContablixIconProps) {
 interface ContablixLogoProps {
   className?: string
   height?: number
-  showTagline?: boolean
 }
 
 /**
- * Logotipo completo "contablix"
- * Uso: Login, páginas de marketing, headers expandidos
+ * Logotipo completo "contablix" en azul con acento verde
+ * Uso: Sidebars, headers, páginas de marketing
  */
-export function ContablixLogo({ className, height = 40, showTagline }: ContablixLogoProps) {
-  // Aspect ratio del logo completo es aproximadamente 6:1
-  const width = height * 6
+export function ContablixLogo({ className, height = 24 }: ContablixLogoProps) {
+  // Aspect ratio aproximado del logotipo: 5.5:1
+  const width = height * 5.5
 
   return (
-    <div className={cn('flex flex-col items-center', className)}>
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 360 60"
-        fill="none"
-        width={width}
-        height={height}
-        aria-label="Contablix"
-      >
-        {/* c */}
-        <path
-          d="M0 30c0-16.5 11-30 28-30 7 0 13 2 17 6l-8 11c-2-2-5-4-9-4-8 0-13 7-13 17s5 17 13 17c4 0 7-2 9-4l8 11c-4 4-10 6-17 6-17 0-28-13.5-28-30z"
-          fill="#14315d"
-        />
-        {/* o */}
-        <path
-          d="M45 30c0-16.5 11-30 27-30s27 13.5 27 30-11 30-27 30-27-13.5-27-30zm39 0c0-10-5-17-12-17s-12 7-12 17 5 17 12 17 12-7 12-17z"
-          fill="#14315d"
-        />
-        {/* n */}
-        <path
-          d="M104 2h14v10c3-7 10-12 19-12 13 0 21 9 21 24v34h-15V28c0-9-4-14-12-14-9 0-13 6-13 17v27h-14V2z"
-          fill="#14315d"
-        />
-        {/* t */}
-        <path
-          d="M167 14V2h14v12h12v12h-12v22c0 5 2 7 7 7h5v12c-2 1-6 1-9 1-13 0-17-6-17-19V26h-9V14h9z"
-          fill="#14315d"
-        />
-        {/* a */}
-        <path
-          d="M195 44c0-11 9-17 24-18l11-1v-2c0-6-4-10-11-10-6 0-10 3-11 8h-14c1-12 11-21 26-21 16 0 25 9 25 24v34h-14v-8c-4 6-10 10-19 10-12 0-17-7-17-16zm35-5v-5l-11 1c-8 1-11 3-11 8s3 7 9 7c9 0 13-5 13-11z"
-          fill="#14315d"
-        />
-        {/* b */}
-        <path
-          d="M253 2h14v14c4-6 10-11 19-11 16 0 26 13 26 30s-10 30-26 30c-9 0-15-4-18-10v8h-15V2zm29 28c0-11-5-17-13-17s-13 6-13 17 5 17 13 17 13-6 13-17z"
-          fill="#14315d"
-        />
-        {/* l */}
-        <path d="M318 2h14v56h-14V2z" fill="#14315d" />
-        {/* i */}
-        <path d="M340 14h14v44h-14V14z" fill="#14315d" />
-        {/* x con acento verde */}
-        <path
-          d="M340 30l-7-10 7-10 7 10-7 10z"
-          fill="#14315d"
-          transform="translate(0, -18) scale(0.8)"
-        />
-        {/* Punto de la i + acento verde */}
-        <rect x="340" y="0" width="14" height="10" fill="#14315d" />
-        <polygon points="354,0 360,0 358,6 352,6" fill="#00b67a" />
-      </svg>
-      {showTagline && (
-        <p className="text-xs text-muted-foreground mt-1">
-          Software contable inteligente
-        </p>
-      )}
-    </div>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 220 40"
+      fill="none"
+      width={width}
+      height={height}
+      className={cn('shrink-0', className)}
+      aria-label="Contablix"
+    >
+      {/* c */}
+      <path
+        d="M0 20c0-11 7-20 18-20 4 0 8 1.5 11 4.5L24 11c-1.5-1.5-3.5-2.5-6-2.5-5 0-8 4.5-8 11.5s3 11.5 8 11.5c2.5 0 4.5-1 6-2.5l5 6.5c-3 3-7 4.5-11 4.5-11 0-18-9-18-20z"
+        fill="#14315d"
+      />
+      {/* o */}
+      <path
+        d="M32 20c0-11 7-20 17-20s17 9 17 20-7 20-17 20-17-9-17-20zm25 0c0-7-3.5-11.5-8-11.5S41 13 41 20s3.5 11.5 8 11.5 8-4.5 8-11.5z"
+        fill="#14315d"
+      />
+      {/* n */}
+      <path
+        d="M70 1h9v7c2-5 7-8 13-8 9 0 14 6 14 16v23h-9V18c0-6-3-9-8-9-6 0-10 4-10 12v18h-9V1z"
+        fill="#14315d"
+      />
+      {/* t */}
+      <path
+        d="M112 9V1h9v8h8v8h-8v15c0 3 1.5 4.5 4.5 4.5h3.5v8c-1.5.5-4 .5-6 .5-8 0-11-4-11-13V17h-6V9h6z"
+        fill="#14315d"
+      />
+      {/* a */}
+      <path
+        d="M134 29c0-7 6-11 15-12l7-.5v-1c0-4-2.5-6.5-7-6.5-4 0-6.5 2-7 5h-9c.5-8 7-14 17-14 10 0 16 6 16 16v23h-9v-5c-2.5 4-7 6.5-12 6.5-8 0-11-4.5-11-11zm22-3v-3l-7 .5c-5 .5-7 2-7 5s2 4.5 6 4.5c6 0 8-3 8-7z"
+        fill="#14315d"
+      />
+      {/* b */}
+      <path
+        d="M166 1h9v9c2.5-4 7-7.5 13-7.5 10 0 17 8.5 17 20s-7 20-17 20c-6 0-10.5-3-13-7v6h-9V1zm19 30.5c5 0 8.5-4 8.5-11.5s-3.5-11.5-8.5-11.5-8.5 4-8.5 11.5 3.5 11.5 8.5 11.5z"
+        fill="#14315d"
+      />
+      {/* l */}
+      <path d="M209 1h9v38h-9V1z" fill="#14315d" />
+      {/* i + acento verde */}
+      <rect x="220" y="9" width="9" height="30" fill="#14315d" />
+      <rect x="220" y="0" width="9" height="6" fill="#14315d" />
+      {/* Acento verde sobre la i */}
+      <polygon points="229,0 235,0 233,4 227,4" fill="#00b67a" />
+    </svg>
   )
 }
 
 /**
- * Versión compacta del isotipo con texto "RECABLIX"
- * Uso: Sidebars cuando se necesita mostrar el nombre del producto
+ * Isotipo CX con fondo blanco (para usar donde se necesite el icono con fondo)
  */
-export function RecablixBrand({ className }: { className?: string }) {
+export function ContablixIconWithBg({ className, size = 32 }: ContablixIconProps) {
   return (
-    <div className={cn('flex items-center gap-3', className)}>
-      <ContablixIcon size={32} />
-      <div>
-        <h1 className="font-semibold text-foreground">RECABLIX</h1>
-      </div>
-    </div>
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 64 64"
+      fill="none"
+      width={size}
+      height={size}
+      className={cn('shrink-0', className)}
+      aria-label="Contablix"
+    >
+      <rect width="64" height="64" fill="white" rx="8" />
+      <path
+        d="M12 32c0-11 8-20 19-20 5 0 9 1.5 12 4l-6.5 8c-1.5-1.5-3.5-2.5-5.5-2.5-6 0-9 4.5-9 10.5s3 10.5 9 10.5c2 0 4-1 5.5-2.5l6.5 8c-3 2.5-7 4-12 4-11 0-19-9-19-20z"
+        fill="#14315d"
+      />
+      <path
+        d="M32 24l7-10h10l-12 16 12 16h-10l-7-10-7 10h-10l12-16-12-16h10l7 10z"
+        fill="#14315d"
+      />
+      <polygon points="44,14 56,14 52,20 40,20" fill="#00b67a" />
+    </svg>
   )
 }

@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 import { $impersonatedStudio, loadImpersonatedStudio } from '@/stores/impersonate'
 import { MyStudiosNav } from './MyStudiosNav'
-import { ContablixIcon } from '@/components/ui/contablix-logo'
+import { ContablixLogo } from '@/components/ui/contablix-logo'
 import type { MyStudio } from '@/stores/session'
 
 const adminNavigation = [
@@ -48,13 +48,9 @@ export function AdminSidebar({
 
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col">
-      {/* Logo */}
-      <div className="h-16 flex items-center gap-3 px-4 border-b border-border">
-        <ContablixIcon size={32} />
-        <div>
-          <h1 className="font-semibold text-foreground">RECABLIX</h1>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">SuperAdmin</p>
-        </div>
+      {/* Logo Contablix */}
+      <div className="h-16 flex items-center px-4 border-b border-border">
+        <ContablixLogo height={20} />
       </div>
 
       {/* Navigation */}
