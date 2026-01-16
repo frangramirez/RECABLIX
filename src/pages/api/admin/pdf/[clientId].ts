@@ -2,6 +2,7 @@ import type { APIRoute } from 'astro'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { getStudioFromSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { config as appConfig, getTenantSchemaName } from '@/lib/config'
 import {
   calculateRecategorization,
   type ClientData,
@@ -13,6 +14,19 @@ import { ReportTemplate } from '@/lib/pdf/ReportTemplate'
 // @react-pdf/renderer necesita más tiempo y memoria que el default
 export const config = {
   maxDuration: 30, // 30 segundos (máximo en Pro)
+}
+
+/**
+ * Helper para obtener el query builder correcto según el schema
+ */
+function getQueryBuilder(studioId: string, table: string) {
+  if (!supabaseAdmin) throw new Error('supabaseAdmin not configured')
+
+  if (appConfig.USE_TENANT_SCHEMAS && appConfig.TENANT_TABLES.includes(table as any)) {
+    const schemaName = getTenantSchemaName(studioId)
+    return supabaseAdmin.schema(schemaName).from(table)
+  }
+  return supabaseAdmin.from(table)
 }
 
 /**
@@ -35,9 +49,15 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
     return new Response('Client ID required', { status: 400 })
   }
 
-  // Obtener cliente con datos de reca (sin filtrar por studio)
-  const { data: clientWithData, error: clientError } = await supabaseAdmin
-    .from('clients')
+  // Obtener studioId del query param (requerido para tenant schemas)
+  const studioId = url.searchParams.get('studioId')
+  if (!studioId) {
+    return new Response('studioId query param required', { status: 400 })
+  }
+
+  // Obtener cliente con datos de reca usando tenant schema si está habilitado
+  const clientsQuery = getQueryBuilder(studioId, 'clients')
+  const { data: clientWithData, error: clientError } = await clientsQuery
     .select(`
       id, name, cuit, studio_id,
       reca_client_data (
@@ -85,9 +105,9 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
     return new Response('No scales found', { status: 400 })
   }
 
-  // Obtener transacciones del periodo (tabla reca_transactions)
-  const { data: txData } = await supabaseAdmin
-    .from('reca_transactions')
+  // Obtener transacciones del periodo (tabla reca_transactions - puede estar en tenant schema)
+  const txQuery = getQueryBuilder(studioId, 'reca_transactions')
+  const { data: txData } = await txQuery
     .select('transaction_type, amount')
     .eq('client_id', clientId)
     .gte('period', period.sales_period_start)

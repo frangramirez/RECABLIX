@@ -439,7 +439,7 @@ export function ClientsGlobalManager() {
                   variant="outline"
                   className="flex-1"
                   onClick={() => {
-                    window.open(`/api/admin/pdf/${selectedClient.id}`, '_blank')
+                    window.open(`/api/admin/pdf/${selectedClient.id}?studioId=${selectedClient.studio_id}`, '_blank')
                   }}
                 >
                   <FileText className="h-4 w-4 mr-2" />
