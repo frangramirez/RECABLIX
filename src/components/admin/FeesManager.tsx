@@ -52,6 +52,21 @@ interface FeeComponent {
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
 
+// Formatear número con separador de miles (ej: 1234567.89 → "1.234.567,89")
+function formatNumber(value: number | null | undefined): string {
+  if (value === null || value === undefined || isNaN(value)) return ''
+  return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+// Parsear string formateado a número (ej: "1.234.567,89" → 1234567.89)
+function parseFormattedNumber(str: string): number | null {
+  if (!str.trim()) return null
+  // Remover separadores de miles (puntos) y convertir coma decimal a punto
+  const normalized = str.replace(/\./g, '').replace(',', '.')
+  const num = parseFloat(normalized)
+  return isNaN(num) ? null : num
+}
+
 const PROVINCES = [
   { code: '901', name: 'CABA' },
   { code: '902', name: 'Buenos Aires' },
@@ -452,14 +467,14 @@ export function FeesManager({ periods }: Props) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-32">Provincia</TableHead>
+                    <TableHead className="w-40">Provincia</TableHead>
+                    <TableHead className="text-center w-10" title="IIBB Integrado">Int.</TableHead>
+                    <TableHead className="text-center w-10" title="Municipal">Mun.</TableHead>
                     {CATEGORIES.map((cat) => (
-                      <TableHead key={cat} className="text-center w-24">
+                      <TableHead key={cat} className="text-center px-1">
                         {cat}
                       </TableHead>
                     ))}
-                    <TableHead className="text-center">Municipal</TableHead>
-                    <TableHead className="text-center">IIBB Integrado</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -474,53 +489,11 @@ export function FeesManager({ periods }: Props) {
                         key={prov.code}
                         className={cn(!hasIntegrated && 'bg-muted/30 opacity-60')}
                       >
-                        <TableCell className="font-medium">{prov.name}</TableCell>
-                        {CATEGORIES.map((cat) => {
-                          const comp = components.find(
-                            (c) =>
-                              c.component_code === prov.code && c.category === cat
-                          )
-                          return (
-                            <TableCell key={cat}>
-                              <Input
-                                type="number"
-                                step="0.01"
-                                value={comp?.value || ''}
-                                onChange={(e) =>
-                                  updateComponent(
-                                    prov.code,
-                                    cat,
-                                    'value',
-                                    parseFloat(e.target.value) || null
-                                  )
-                                }
-                                placeholder="0.00"
-                                className={cn('w-20', !hasIntegrated && 'cursor-not-allowed')}
-                                disabled={!hasIntegrated}
-                              />
-                            </TableCell>
-                          )
-                        })}
-                        <TableCell className="text-center">
-                          <Checkbox
-                            checked={firstComp?.has_municipal || false}
-                            onCheckedChange={(checked: boolean) => {
-                              // Aplicar a todas las categorías de la provincia
-                              setComponents((prev) =>
-                                prev.map((c) =>
-                                  c.component_code === prov.code
-                                    ? { ...c, has_municipal: !!checked }
-                                    : c
-                                )
-                              )
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="font-medium py-1">{prov.name}</TableCell>
+                        <TableCell className="text-center py-1">
                           <Checkbox
                             checked={hasIntegrated}
                             onCheckedChange={(checked: boolean) => {
-                              // Aplicar a todas las categorías de la provincia
                               setComponents((prev) =>
                                 prev.map((c) =>
                                   c.component_code === prov.code
@@ -531,6 +504,56 @@ export function FeesManager({ periods }: Props) {
                             }}
                           />
                         </TableCell>
+                        <TableCell className="text-center py-1">
+                          <Checkbox
+                            checked={firstComp?.has_municipal || false}
+                            onCheckedChange={(checked: boolean) => {
+                              setComponents((prev) =>
+                                prev.map((c) =>
+                                  c.component_code === prov.code
+                                    ? { ...c, has_municipal: !!checked }
+                                    : c
+                                )
+                              )
+                            }}
+                          />
+                        </TableCell>
+                        {CATEGORIES.map((cat) => {
+                          const comp = components.find(
+                            (c) =>
+                              c.component_code === prov.code && c.category === cat
+                          )
+                          return (
+                            <TableCell key={cat} className="px-1 py-1">
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                value={formatNumber(comp?.value)}
+                                onChange={(e) => {
+                                  const parsed = parseFormattedNumber(e.target.value)
+                                  updateComponent(prov.code, cat, 'value', parsed)
+                                }}
+                                onFocus={(e) => {
+                                  // Al enfocar, mostrar valor sin formato para edición
+                                  if (comp?.value !== null && comp?.value !== undefined) {
+                                    e.target.value = String(comp.value)
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  // Al salir, reformatear el valor
+                                  const parsed = parseFormattedNumber(e.target.value)
+                                  updateComponent(prov.code, cat, 'value', parsed)
+                                }}
+                                placeholder="0,00"
+                                className={cn(
+                                  'w-28 text-right tabular-nums',
+                                  !hasIntegrated && 'cursor-not-allowed'
+                                )}
+                                disabled={!hasIntegrated}
+                              />
+                            </TableCell>
+                          )
+                        })}
                       </TableRow>
                     )
                   })}
@@ -551,9 +574,9 @@ export function FeesManager({ periods }: Props) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-32">Provincia</TableHead>
+                    <TableHead className="w-40">Provincia</TableHead>
                     {CATEGORIES.map((cat) => (
-                      <TableHead key={cat} className="text-center w-24">
+                      <TableHead key={cat} className="text-center px-1">
                         {cat}
                       </TableHead>
                     ))}
@@ -561,7 +584,6 @@ export function FeesManager({ periods }: Props) {
                 </TableHeader>
                 <TableBody>
                   {PROVINCES.map((prov) => {
-                    // Verificar si tiene municipal habilitado en el componente provincial
                     const provincialComp = components.find(
                       (c) => c.component_code === prov.code && c.category === 'A'
                     )
@@ -572,28 +594,36 @@ export function FeesManager({ periods }: Props) {
                         key={prov.code}
                         className={cn(!hasMunicipal && 'bg-muted/30 opacity-60')}
                       >
-                        <TableCell className="font-medium">{prov.name}</TableCell>
+                        <TableCell className="font-medium py-1">{prov.name}</TableCell>
                         {CATEGORIES.map((cat) => {
                           const comp = components.find(
                             (c) =>
                               c.component_code === `${prov.code}M` && c.category === cat
                           )
                           return (
-                            <TableCell key={cat}>
+                            <TableCell key={cat} className="px-1 py-1">
                               <Input
-                                type="number"
-                                step="0.01"
-                                value={comp?.value || ''}
-                                onChange={(e) =>
-                                  updateComponent(
-                                    `${prov.code}M`,
-                                    cat,
-                                    'value',
-                                    parseFloat(e.target.value) || null
-                                  )
-                                }
-                                placeholder="0.00"
-                                className={cn('w-20', !hasMunicipal && 'cursor-not-allowed')}
+                                type="text"
+                                inputMode="decimal"
+                                value={formatNumber(comp?.value)}
+                                onChange={(e) => {
+                                  const parsed = parseFormattedNumber(e.target.value)
+                                  updateComponent(`${prov.code}M`, cat, 'value', parsed)
+                                }}
+                                onFocus={(e) => {
+                                  if (comp?.value !== null && comp?.value !== undefined) {
+                                    e.target.value = String(comp.value)
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const parsed = parseFormattedNumber(e.target.value)
+                                  updateComponent(`${prov.code}M`, cat, 'value', parsed)
+                                }}
+                                placeholder="0,00"
+                                className={cn(
+                                  'w-28 text-right tabular-nums',
+                                  !hasMunicipal && 'cursor-not-allowed'
+                                )}
                                 disabled={!hasMunicipal}
                               />
                             </TableCell>
