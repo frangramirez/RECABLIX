@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useSession } from '@/components/providers/SessionProvider'
 import { useTenantSupabase } from '@/hooks/useTenantSupabase'
-import { config } from '@/lib/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -180,33 +179,15 @@ export function ClientForm({ initialData, studioId }: Props) {
 
         toast({ title: 'Actualizado', description: 'Cliente actualizado correctamente' })
       } else {
-        // CREATE: insertar en clients y luego en reca_client_data
-        // En tenant schema no hay studio_id (aislamiento por schema)
-        const clientInsertData = config.USE_TENANT_SCHEMAS
-          ? {
-              name: formData.name,
-              cuit: formData.cuit?.trim() || null,
-              apps: formData.uses_recablix ? ['recablix'] : [],
-              fiscal_year: new Date().getFullYear(),
-            }
-          : {
-              studio_id: studioId,
-              name: formData.name,
-              cuit: formData.cuit?.trim() || null,
-              apps: formData.uses_recablix ? ['recablix'] : [],
-              fiscal_year: new Date().getFullYear(),
-            }
-
-        const { data: newClient, error: clientError } = await query('clients')
-          .insert(clientInsertData)
-          .select()
-          .single()
-
-        if (clientError) throw clientError
-
-        const { error: recaError } = await query('reca_client_data')
-          .insert({
-            client_id: newClient.id,
+        // CREATE: usar endpoint API que bypasea RLS con supabaseAdmin
+        // Necesario porque auth.uid() puede ser NULL en sesiones de superadmin/impersonación
+        const response = await fetch('/api/clients', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+            cuit: formData.cuit,
+            uses_recablix: formData.uses_recablix,
             activity: formData.activity,
             province_code: formData.province_code,
             works_in_rd: formData.works_in_rd,
@@ -216,15 +197,20 @@ export function ClientForm({ initialData, studioId }: Props) {
             has_multilateral: formData.has_multilateral,
             has_local: formData.has_local,
             rents_local: formData.rents_local,
-            lessor_cuit: formData.lessor_cuit?.trim() || null,
+            lessor_cuit: formData.lessor_cuit,
             local_m2: formData.local_m2,
             annual_rent: formData.annual_rent,
             annual_mw: formData.annual_mw,
             previous_category: formData.previous_category,
             previous_fee: formData.previous_fee,
-          })
+          }),
+        })
 
-        if (recaError) throw recaError
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Error al crear cliente')
+        }
 
         toast({ title: 'Creado', description: 'Cliente creado correctamente' })
       }
