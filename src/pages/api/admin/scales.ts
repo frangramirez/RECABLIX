@@ -11,6 +11,11 @@ interface ScaleInput {
   max_annual_mw: number | null
   max_annual_rent: number | null
   max_unit_sale: number | null
+  // Fee components (se guardan en reca_fee_components)
+  fee_s20?: number | null  // Imp. Servicios
+  fee_b20?: number | null  // Imp. Vta.Bienes
+  fee_021?: number | null  // Aporte SIPA
+  fee_024?: number | null  // Aporte OS
 }
 
 export const POST: APIRoute = async ({ request, cookies }) => {
@@ -73,6 +78,103 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         JSON.stringify({ error: error.message }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
+    }
+
+    // ────────────────────────────────────────────────────────────
+    // Guardar componentes de cuota (IMP, JUB, OS)
+    // ────────────────────────────────────────────────────────────
+    const feeComponents: Array<{
+      reca_id: string
+      component_code: string
+      description: string
+      component_type: 'IMP' | 'JUB' | 'OS'
+      category: string
+      value: number
+    }> = []
+
+    // Obtener valor de 021 Cat. A para usarlo en 21J
+    const scale021CatA = scales.find(s => s.category === 'A')
+    const value021CatA = scale021CatA?.fee_021 ?? null
+
+    for (const scale of scales) {
+      const { category } = scale
+
+      // S20 - Imp. Servicios
+      if (scale.fee_s20 !== null && scale.fee_s20 !== undefined) {
+        feeComponents.push({
+          reca_id: recaId,
+          component_code: 'S20',
+          description: 'Impuesto Integrado',
+          component_type: 'IMP',
+          category,
+          value: scale.fee_s20,
+        })
+      }
+
+      // B20 - Imp. Vta.Bienes
+      if (scale.fee_b20 !== null && scale.fee_b20 !== undefined) {
+        feeComponents.push({
+          reca_id: recaId,
+          component_code: 'B20',
+          description: 'Impuesto Integrado',
+          component_type: 'IMP',
+          category,
+          value: scale.fee_b20,
+        })
+      }
+
+      // 021 - Aporte SIPA
+      if (scale.fee_021 !== null && scale.fee_021 !== undefined) {
+        feeComponents.push({
+          reca_id: recaId,
+          component_code: '021',
+          description: 'Aporte SIPA',
+          component_type: 'JUB',
+          category,
+          value: scale.fee_021,
+        })
+      }
+
+      // 21J - Jubilatorio Jubilado (SIEMPRE usa valor de 021 Cat. A)
+      if (value021CatA !== null) {
+        feeComponents.push({
+          reca_id: recaId,
+          component_code: '21J',
+          description: 'Jubilatorio (aporte mínimo)',
+          component_type: 'JUB',
+          category,
+          value: value021CatA,
+        })
+      }
+
+      // 024 - Aporte OS
+      if (scale.fee_024 !== null && scale.fee_024 !== undefined) {
+        feeComponents.push({
+          reca_id: recaId,
+          component_code: '024',
+          description: 'Aporte Obra Social',
+          component_type: 'OS',
+          category,
+          value: scale.fee_024,
+        })
+      }
+    }
+
+    // Upsert de fee components (si hay alguno)
+    if (feeComponents.length > 0) {
+      const { error: feeError } = await supabaseAdmin
+        .from('reca_fee_components')
+        .upsert(feeComponents, {
+          onConflict: 'reca_id,component_code,category',
+        })
+
+      if (feeError) {
+        console.error('Error saving fee components:', feeError)
+        return new Response(
+          JSON.stringify({ error: feeError.message }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     return new Response(

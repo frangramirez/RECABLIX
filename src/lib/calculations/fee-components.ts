@@ -140,10 +140,13 @@ export function calculateFeeComponentsFromData(
       reason: input.worksInRD ? 'Trabaja en Relación de Dependencia' : 'Solo locación ≤2 inmuebles'
     })
   } else if (input.isRetired) {
-    // Jubilado paga el mínimo (código 21J)
-    const comp = categoryComponents.find(c => c.component_code === '21J')
-    if (comp) {
-      subtotals.jubilatorio = Number(comp.value)
+    // 21J: SIEMPRE usa valor de 021 Cat. A (no depende de categoría del cliente)
+    // Buscar en todos los componentes, no solo los de la categoría del cliente
+    const comp021CatA = allComponents.find(
+      c => c.component_code === '021' && c.category === 'A'
+    )
+    if (comp021CatA) {
+      subtotals.jubilatorio = Number(comp021CatA.value)
       components.push({
         code: '21J',
         description: 'Jubilatorio (aporte mínimo)',

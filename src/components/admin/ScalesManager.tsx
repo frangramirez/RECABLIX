@@ -39,6 +39,11 @@ interface RecaScale {
   max_annual_mw: number | null
   max_annual_rent: number | null
   max_unit_sale: number | null
+  // Fee components (de reca_fee_components)
+  fee_s20: number | null  // Imp. Servicios
+  fee_b20: number | null  // Imp. Bienes
+  fee_021: number | null  // Aporte SIPA
+  fee_024: number | null  // Aporte OS
 }
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
@@ -72,17 +77,27 @@ export function ScalesManager({ periods }: Props) {
 
     setIsLoading(true)
     try {
-      const { data, error } = await supabase
+      // Query 1: Escalas
+      const { data: scalesData, error: scalesError } = await supabase
         .from('reca_scales')
         .select('*')
         .eq('reca_id', selectedPeriodId)
         .order('category')
 
-      if (error) throw error
+      if (scalesError) throw scalesError
+
+      // Query 2: Fee components (IMP, JUB, OS)
+      const { data: feeData, error: feeError } = await supabase
+        .from('reca_fee_components')
+        .select('component_code, category, value')
+        .eq('reca_id', selectedPeriodId)
+        .in('component_type', ['IMP', 'JUB', 'OS'])
+
+      if (feeError) throw feeError
 
       // Si no existen escalas, crear plantilla vacía
-      if (!data || data.length === 0) {
-        const emptyScales = CATEGORIES.map((cat) => ({
+      if (!scalesData || scalesData.length === 0) {
+        const emptyScales: RecaScale[] = CATEGORIES.map((cat) => ({
           reca_id: selectedPeriodId,
           category: cat,
           max_annual_income: null,
@@ -90,12 +105,40 @@ export function ScalesManager({ periods }: Props) {
           max_annual_mw: 20000,
           max_annual_rent: null,
           max_unit_sale: null,
+          fee_s20: null,
+          fee_b20: null,
+          fee_021: null,
+          fee_024: null,
         }))
         setScales(emptyScales)
         setOriginalScales([])
       } else {
-        setScales(data)
-        setOriginalScales(JSON.parse(JSON.stringify(data)))
+        // Mergear escalas con fee components
+        const mergedScales: RecaScale[] = scalesData.map((scale: any) => {
+          const s20 = feeData?.find(
+            (f: any) => f.category === scale.category && f.component_code === 'S20'
+          )
+          const b20 = feeData?.find(
+            (f: any) => f.category === scale.category && f.component_code === 'B20'
+          )
+          const c021 = feeData?.find(
+            (f: any) => f.category === scale.category && f.component_code === '021'
+          )
+          const c024 = feeData?.find(
+            (f: any) => f.category === scale.category && f.component_code === '024'
+          )
+
+          return {
+            ...scale,
+            fee_s20: s20?.value ?? null,
+            fee_b20: b20?.value ?? null,
+            fee_021: c021?.value ?? null,
+            fee_024: c024?.value ?? null,
+          }
+        })
+
+        setScales(mergedScales)
+        setOriginalScales(JSON.parse(JSON.stringify(mergedScales)))
       }
     } catch (error: any) {
       console.error('Error fetching scales:', error)
@@ -125,7 +168,11 @@ export function ScalesManager({ periods }: Props) {
       current?.max_local_m2 !== original.max_local_m2 ||
       current?.max_annual_mw !== original.max_annual_mw ||
       current?.max_annual_rent !== original.max_annual_rent ||
-      current?.max_unit_sale !== original.max_unit_sale
+      current?.max_unit_sale !== original.max_unit_sale ||
+      current?.fee_s20 !== original.fee_s20 ||
+      current?.fee_b20 !== original.fee_b20 ||
+      current?.fee_021 !== original.fee_021 ||
+      current?.fee_024 !== original.fee_024
     )
   }
 
@@ -148,6 +195,10 @@ export function ScalesManager({ periods }: Props) {
             max_annual_mw: s.max_annual_mw,
             max_annual_rent: s.max_annual_rent,
             max_unit_sale: s.max_unit_sale,
+            fee_s20: s.fee_s20,
+            fee_b20: s.fee_b20,
+            fee_021: s.fee_021,
+            fee_024: s.fee_024,
           })),
         }),
       })
@@ -155,7 +206,7 @@ export function ScalesManager({ periods }: Props) {
       const result = await response.json()
       if (!response.ok) throw new Error(result.error || 'Error al guardar')
 
-      toast.success('Escalas guardadas correctamente')
+      toast.success('Escalas y componentes guardados correctamente')
       fetchScales() // Reload para actualizar IDs y originalScales
     } catch (error: any) {
       console.error('Error saving scales:', error)
@@ -168,30 +219,58 @@ export function ScalesManager({ periods }: Props) {
   async function handleCopyFrom(sourcePeriodId: string) {
     try {
       // Fetch escalas del período origen
-      const { data, error } = await supabase
+      const { data: scalesData, error: scalesError } = await supabase
         .from('reca_scales')
         .select('*')
         .eq('reca_id', sourcePeriodId)
 
-      if (error) throw error
-      if (!data || data.length === 0) {
+      if (scalesError) throw scalesError
+      if (!scalesData || scalesData.length === 0) {
         toast.error('El período seleccionado no tiene escalas configuradas')
         return
       }
 
-      // Mapear a período actual (sin IDs)
-      const copiedScales = data.map((s) => ({
-        reca_id: selectedPeriodId,
-        category: s.category,
-        max_annual_income: s.max_annual_income,
-        max_local_m2: s.max_local_m2,
-        max_annual_mw: s.max_annual_mw,
-        max_annual_rent: s.max_annual_rent,
-        max_unit_sale: s.max_unit_sale,
-      }))
+      // Fetch fee components del período origen
+      const { data: feeData, error: feeError } = await supabase
+        .from('reca_fee_components')
+        .select('component_code, category, value')
+        .eq('reca_id', sourcePeriodId)
+        .in('component_type', ['IMP', 'JUB', 'OS'])
+
+      if (feeError) throw feeError
+
+      // Mapear a período actual (sin IDs) y mergear con fee components
+      const copiedScales: RecaScale[] = scalesData.map((s: any) => {
+        const s20 = feeData?.find(
+          (f: any) => f.category === s.category && f.component_code === 'S20'
+        )
+        const b20 = feeData?.find(
+          (f: any) => f.category === s.category && f.component_code === 'B20'
+        )
+        const c021 = feeData?.find(
+          (f: any) => f.category === s.category && f.component_code === '021'
+        )
+        const c024 = feeData?.find(
+          (f: any) => f.category === s.category && f.component_code === '024'
+        )
+
+        return {
+          reca_id: selectedPeriodId,
+          category: s.category,
+          max_annual_income: s.max_annual_income,
+          max_local_m2: s.max_local_m2,
+          max_annual_mw: s.max_annual_mw,
+          max_annual_rent: s.max_annual_rent,
+          max_unit_sale: s.max_unit_sale,
+          fee_s20: s20?.value ?? null,
+          fee_b20: b20?.value ?? null,
+          fee_021: c021?.value ?? null,
+          fee_024: c024?.value ?? null,
+        }
+      })
 
       setScales(copiedScales)
-      toast.success('Escalas copiadas. Recuerda guardar los cambios.')
+      toast.success('Escalas y componentes copiados. Recuerda guardar los cambios.')
     } catch (error: any) {
       console.error('Error copying scales:', error)
       toast.error(error.message || 'Error al copiar escalas')
@@ -209,15 +288,20 @@ export function ScalesManager({ periods }: Props) {
       'Alquileres Anuales Máx': s.max_annual_rent || '',
       'Energía Máx (mW)': s.max_annual_mw || '',
       'Venta Unitaria Máx': s.max_unit_sale || '',
+      'Imp. Serv.': s.fee_s20 || '',
+      'Imp. Bienes': s.fee_b20 || '',
+      'SIPA': s.fee_021 || '',
+      'OS': s.fee_024 || '',
     }))
 
     const ws = XLSX.utils.json_to_sheet(exportData)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, `Escalas_${periodCode}`)
 
-    // Ajustar anchos de columna
+    // Ajustar anchos de columna (ahora 10 columnas)
     ws['!cols'] = [
-      { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 18 }
+      { wch: 12 }, { wch: 18 }, { wch: 18 }, { wch: 22 }, { wch: 16 }, { wch: 18 },
+      { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }
     ]
 
     XLSX.writeFile(wb, `escalas_${periodCode}.xlsx`)
@@ -254,6 +338,10 @@ export function ScalesManager({ periods }: Props) {
           const maxRent = parseFloat(row['Alquileres Anuales Máx'] || row['Alquileres Anuales Max'] || '')
           const maxMW = parseFloat(row['Energía Máx (mW)'] || row['Energia Max (mW)'] || '')
           const maxUnitSale = parseFloat(row['Venta Unitaria Máx'] || row['Venta Unitaria Max'] || '')
+          const feeS20 = parseFloat(row['Imp. Serv.'] || row['Imp Serv'] || '')
+          const feeB20 = parseFloat(row['Imp. Bienes'] || row['Imp Bienes'] || '')
+          const fee021 = parseFloat(row['SIPA'] || '')
+          const fee024 = parseFloat(row['OS'] || '')
 
           importedScales.push({
             reca_id: selectedPeriodId,
@@ -263,6 +351,10 @@ export function ScalesManager({ periods }: Props) {
             max_annual_rent: isNaN(maxRent) ? null : maxRent,
             max_annual_mw: isNaN(maxMW) ? null : maxMW,
             max_unit_sale: isNaN(maxUnitSale) ? null : maxUnitSale,
+            fee_s20: isNaN(feeS20) ? null : feeS20,
+            fee_b20: isNaN(feeB20) ? null : feeB20,
+            fee_021: isNaN(fee021) ? null : fee021,
+            fee_024: isNaN(fee024) ? null : fee024,
           })
         })
 
@@ -396,6 +488,10 @@ export function ScalesManager({ periods }: Props) {
                 <TableHead>Monto Alquileres</TableHead>
                 <TableHead>Energía (mW)</TableHead>
                 <TableHead>Venta Unitaria</TableHead>
+                <TableHead className="min-w-[110px] bg-blue-50">Imp. Serv.</TableHead>
+                <TableHead className="min-w-[110px] bg-blue-50">Imp. Bienes</TableHead>
+                <TableHead className="min-w-[100px] bg-green-50">SIPA</TableHead>
+                <TableHead className="min-w-[100px] bg-amber-50">OS</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -478,6 +574,70 @@ export function ScalesManager({ periods }: Props) {
                           updateScale(
                             scale.category,
                             'max_unit_sale',
+                            e.target.value
+                          )
+                        }
+                        className="w-full"
+                        placeholder="0.00"
+                      />
+                    </TableCell>
+                    <TableCell className="bg-blue-50/20">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={scale.fee_s20 || ''}
+                        onChange={(e) =>
+                          updateScale(
+                            scale.category,
+                            'fee_s20',
+                            e.target.value
+                          )
+                        }
+                        className="w-full"
+                        placeholder="0.00"
+                      />
+                    </TableCell>
+                    <TableCell className="bg-blue-50/20">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={scale.fee_b20 || ''}
+                        onChange={(e) =>
+                          updateScale(
+                            scale.category,
+                            'fee_b20',
+                            e.target.value
+                          )
+                        }
+                        className="w-full"
+                        placeholder="0.00"
+                      />
+                    </TableCell>
+                    <TableCell className="bg-green-50/20">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={scale.fee_021 || ''}
+                        onChange={(e) =>
+                          updateScale(
+                            scale.category,
+                            'fee_021',
+                            e.target.value
+                          )
+                        }
+                        className="w-full"
+                        placeholder="0.00"
+                      />
+                    </TableCell>
+                    <TableCell className="bg-amber-50/20">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={scale.fee_024 || ''}
+                        onChange={(e) =>
+                          updateScale(
+                            scale.category,
+                            'fee_024',
                             e.target.value
                           )
                         }
