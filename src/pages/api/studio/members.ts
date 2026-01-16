@@ -10,7 +10,7 @@
 
 import type { APIRoute } from 'astro'
 import { getStudioFromSession } from '@/lib/auth'
-import { createSupabaseServerClient, supabaseAdmin } from '@/lib/supabase'
+import { supabaseAdmin } from '@/lib/supabase'
 
 export const GET: APIRoute = async ({ url, cookies, request }) => {
   try {
@@ -39,10 +39,19 @@ export const GET: APIRoute = async ({ url, cookies, request }) => {
 
     const studioId = url.searchParams.get('studio_id') || session.studio.id
 
-    const supabase = createSupabaseServerClient(cookies, request)
+    // Superadmin puede ver cualquier studio, usuarios normales solo el suyo
+    if (!session.is_superadmin && studioId !== session.studio.id) {
+      return new Response(
+        JSON.stringify({ error: 'No tiene acceso a este studio' }),
+        {
+          status: 403,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      )
+    }
 
-    // Obtener miembros con información del usuario
-    const { data: members, error } = await supabase
+    // Usar supabaseAdmin para bypasear RLS (especialmente para superadmins viendo otros studios)
+    const { data: members, error } = await supabaseAdmin
       .from('studio_members')
       .select(
         `
