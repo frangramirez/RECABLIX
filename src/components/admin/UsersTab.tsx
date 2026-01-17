@@ -23,7 +23,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Shield, Building2, User, Pencil, Trash2, Settings, ChevronDown, ChevronRight } from 'lucide-react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { Search, Shield, Building2, User, Pencil, Trash2, Settings, ChevronDown, ChevronRight, Key, Eye, EyeOff, Mail, Calendar, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -80,6 +86,12 @@ export function UsersTab() {
   const [editedPermissions, setEditedPermissions] = useState<MembershipPermissions>({})
   const [isSaving, setIsSaving] = useState(false)
   const [changingRoleFor, setChangingRoleFor] = useState<string | null>(null)
+
+  // Estado para contraseña
+  const [passwordForUserId, setPasswordForUserId] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [isSettingPassword, setIsSettingPassword] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -253,6 +265,63 @@ export function UsersTab() {
     }
   }
 
+  async function handleSetPassword(userId: string) {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+
+    setIsSettingPassword(true)
+    try {
+      const response = await fetch('/api/admin/user-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, password: newPassword }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al establecer contraseña')
+      }
+
+      toast.success('Contraseña actualizada')
+      setNewPassword('')
+      setShowPassword(false)
+      setPasswordForUserId(null)
+    } catch (error) {
+      console.error('Error setting password:', error)
+      const message = error instanceof Error ? error.message : 'Error al establecer contraseña'
+      toast.error(message)
+    } finally {
+      setIsSettingPassword(false)
+    }
+  }
+
+  async function handleToggleSuperadmin(userId: string, currentStatus: boolean) {
+    const action = currentStatus ? 'remove' : 'add'
+    if (!confirm(`¿${action === 'add' ? 'Hacer' : 'Quitar'} SuperAdmin a este usuario?`)) return
+
+    try {
+      const response = await fetch('/api/admin/superadmins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, action }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success(action === 'add' ? 'Usuario ahora es SuperAdmin' : 'SuperAdmin removido')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error toggling superadmin:', error)
+      toast.error('Error al cambiar estado de SuperAdmin')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -397,92 +466,201 @@ export function UsersTab() {
                         {formatDate(user.last_sign_in_at)}
                       </TableCell>
                     </TableRow>
-                    {/* Fila expandida con detalle de estudios */}
+                    {/* Fila expandida con acordeón */}
                     {isExpanded && (
                       <TableRow key={`${user.id}-expanded`} className="bg-muted/20 hover:bg-muted/20">
                         <TableCell colSpan={6} className="py-4">
-                          <div className="pl-6 space-y-3">
-                            <div className="flex items-center gap-4 text-sm">
-                              <span className="text-muted-foreground">Último login:</span>
-                              <span>{formatDate(user.last_sign_in_at)}</span>
-                              <span className="text-muted-foreground ml-4">Registrado:</span>
-                              <span>{formatDate(user.created_at)}</span>
-                            </div>
-                            {user.studios.length === 0 ? (
-                              <p className="text-sm text-muted-foreground italic">
-                                Este usuario no pertenece a ningún estudio
-                              </p>
-                            ) : (
-                              <div className="space-y-2">
-                                <h4 className="text-sm font-medium flex items-center gap-2">
-                                  <Building2 className="h-4 w-4" />
-                                  Membresías ({user.studios.length})
-                                </h4>
-                                <div className="grid gap-2">
-                                  {user.studios.map((studio) => (
-                                    <div
-                                      key={studio.membership_id}
-                                      className="flex items-center justify-between p-3 bg-background rounded-md border"
-                                    >
-                                      <div className="flex items-center gap-3">
-                                        <span className="font-medium">{studio.studio_name}</span>
-                                        {studio.role === 'owner' ? (
-                                          <Badge variant={getRoleBadgeVariant(studio.role)}>
-                                            {studio.role}
-                                          </Badge>
-                                        ) : (
-                                          <Select
-                                            value={studio.role}
-                                            onValueChange={(newRole) => handleRoleChange(studio.membership_id, newRole)}
-                                            disabled={changingRoleFor === studio.membership_id}
-                                          >
-                                            <SelectTrigger
-                                              className="h-7 w-[120px]"
-                                              onClick={(e) => e.stopPropagation()}
-                                            >
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              <SelectItem value="admin">admin</SelectItem>
-                                              <SelectItem value="collaborator">collaborator</SelectItem>
-                                              <SelectItem value="client">client</SelectItem>
-                                            </SelectContent>
-                                          </Select>
-                                        )}
-                                      </div>
-                                      <div className="flex items-center gap-2">
-                                        {studio.role !== 'owner' && (
-                                          <>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                openEditPermissions(studio)
-                                              }}
-                                            >
-                                              <Settings className="h-4 w-4 mr-1" />
-                                              Permisos
-                                            </Button>
-                                            <Button
-                                              variant="ghost"
-                                              size="sm"
-                                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                              onClick={(e) => {
-                                                e.stopPropagation()
-                                                handleDeleteMembership(studio.membership_id, studio.studio_name)
-                                              }}
-                                            >
-                                              <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                          </>
-                                        )}
-                                      </div>
+                          <div className="pl-6">
+                            <Accordion type="multiple" defaultValue={['info', 'memberships']}>
+                              {/* Información */}
+                              <AccordionItem value="info">
+                                <AccordionTrigger className="text-sm font-medium py-2">
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4" />
+                                    Información
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="space-y-3 pt-1">
+                                    <div className="flex items-center gap-3 text-sm">
+                                      <Mail className="h-4 w-4 text-muted-foreground" />
+                                      <span>{user.email}</span>
                                     </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                                    <div className="flex items-center gap-3 text-sm">
+                                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                                      <span>Registrado: {formatDate(user.created_at)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 text-sm">
+                                      <Clock className="h-4 w-4 text-muted-foreground" />
+                                      <span>Último login: {formatDate(user.last_sign_in_at)}</span>
+                                    </div>
+                                    <div className="border-t pt-3 mt-3">
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                          <Shield className="h-4 w-4 text-amber-500" />
+                                          <span className="text-sm">SuperAdmin</span>
+                                        </div>
+                                        <Switch
+                                          checked={user.is_superadmin}
+                                          onCheckedChange={() => handleToggleSuperadmin(user.id, user.is_superadmin)}
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                      </div>
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        Los SuperAdmin tienen acceso completo al sistema.
+                                      </p>
+                                    </div>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+
+                              {/* Contraseña */}
+                              <AccordionItem value="password">
+                                <AccordionTrigger className="text-sm font-medium py-2">
+                                  <div className="flex items-center gap-2">
+                                    <Key className="h-4 w-4" />
+                                    Contraseña
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="space-y-3 pt-1">
+                                    <p className="text-xs text-muted-foreground">
+                                      Establece una nueva contraseña. El usuario no recibirá notificación.
+                                    </p>
+                                    <div className="flex gap-2">
+                                      <div className="relative flex-1">
+                                        <Input
+                                          type={showPassword && passwordForUserId === user.id ? 'text' : 'password'}
+                                          placeholder="Mínimo 6 caracteres"
+                                          value={passwordForUserId === user.id ? newPassword : ''}
+                                          onChange={(e) => {
+                                            setPasswordForUserId(user.id)
+                                            setNewPassword(e.target.value)
+                                          }}
+                                          onClick={(e) => e.stopPropagation()}
+                                          className="pr-10 h-8 text-sm"
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="absolute right-0 top-0 h-full px-2 hover:bg-transparent"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            setPasswordForUserId(user.id)
+                                            setShowPassword(!showPassword)
+                                          }}
+                                        >
+                                          {showPassword && passwordForUserId === user.id ? (
+                                            <EyeOff className="h-3.5 w-3.5" />
+                                          ) : (
+                                            <Eye className="h-3.5 w-3.5" />
+                                          )}
+                                        </Button>
+                                      </div>
+                                      <Button
+                                        size="sm"
+                                        className="h-8"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSetPassword(user.id)
+                                        }}
+                                        disabled={isSettingPassword || (passwordForUserId === user.id ? newPassword.length < 6 : true)}
+                                      >
+                                        {isSettingPassword && passwordForUserId === user.id ? 'Guardando...' : 'Guardar'}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+
+                              {/* Membresías */}
+                              <AccordionItem value="memberships">
+                                <AccordionTrigger className="text-sm font-medium py-2">
+                                  <div className="flex items-center gap-2">
+                                    <Building2 className="h-4 w-4" />
+                                    Membresías ({user.studios.length})
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="space-y-3 pt-1">
+                                    {user.studios.length === 0 ? (
+                                      <p className="text-sm text-muted-foreground italic">
+                                        Este usuario no pertenece a ningún estudio
+                                      </p>
+                                    ) : (
+                                      <div className="grid gap-2">
+                                        {user.studios.map((studio) => (
+                                          <div
+                                            key={studio.membership_id}
+                                            className="flex items-center justify-between p-3 bg-background rounded-md border"
+                                          >
+                                            <div className="flex items-center gap-3">
+                                              <span className="font-medium text-sm">{studio.studio_name}</span>
+                                              {studio.role === 'owner' ? (
+                                                <Badge variant={getRoleBadgeVariant(studio.role)}>
+                                                  {studio.role}
+                                                </Badge>
+                                              ) : (
+                                                <Select
+                                                  value={studio.role}
+                                                  onValueChange={(newRole) => handleRoleChange(studio.membership_id, newRole)}
+                                                  disabled={changingRoleFor === studio.membership_id}
+                                                >
+                                                  <SelectTrigger
+                                                    className="h-7 w-[120px]"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                  >
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="admin">admin</SelectItem>
+                                                    <SelectItem value="collaborator">collaborator</SelectItem>
+                                                    <SelectItem value="client">client</SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              )}
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                              {studio.role !== 'owner' && (
+                                                <>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      openEditPermissions(studio)
+                                                    }}
+                                                  >
+                                                    <Settings className="h-3.5 w-3.5 mr-1" />
+                                                    Permisos
+                                                  </Button>
+                                                  <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation()
+                                                      handleDeleteMembership(studio.membership_id, studio.studio_name)
+                                                    }}
+                                                  >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                  </Button>
+                                                </>
+                                              )}
+                                              {studio.role === 'owner' && (
+                                                <span className="text-xs text-muted-foreground">Owner no editable</span>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            </Accordion>
                           </div>
                         </TableCell>
                       </TableRow>
