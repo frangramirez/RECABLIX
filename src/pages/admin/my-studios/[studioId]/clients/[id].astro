@@ -1,0 +1,118 @@
+---
+/**
+ * Página de edición de cliente individual para /admin/my-studios/[studioId]/clients/[id]
+ * Usa tenant schema para queries
+ */
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { ClientForm } from '@/components/studio/ClientForm'
+import { supabaseAdmin } from '@/lib/supabase'
+import { getTenantSchemaName } from '@/lib/config'
+
+const { studioId, id } = Astro.params
+
+if (!studioId || !id) {
+  return Astro.redirect('/admin/my-studios')
+}
+if (!supabaseAdmin) {
+  return Astro.redirect('/admin')
+}
+
+// Obtener el schema name del studio
+const { data: studio } = await supabaseAdmin
+  .from('studios')
+  .select('id, name, schema_name')
+  .eq('id', studioId)
+  .single()
+
+if (!studio) {
+  return Astro.redirect('/admin/my-studios')
+}
+
+// Usar el schema_name guardado o generar el esperado
+const schemaName = studio.schema_name || getTenantSchemaName(studioId)
+
+// Query al tenant schema para obtener el cliente
+const { data: client, error } = await supabaseAdmin
+  .schema(schemaName)
+  .from('clients')
+  .select(`
+    id,
+    name,
+    cuit,
+    apps,
+    reca_client_data (
+      activity,
+      province_code,
+      works_in_rd,
+      is_retired,
+      dependents,
+      local_m2,
+      annual_rent,
+      annual_mw,
+      previous_category,
+      previous_fee,
+      is_exempt,
+      has_multilateral,
+      has_local,
+      is_rented,
+      landlord_cuit
+    )
+  `)
+  .eq('id', id)
+  .single()
+
+if (error) {
+  console.error('[my-studios/clients/[id]] Error loading client:', error)
+}
+
+if (!client) {
+  return Astro.redirect(`/admin/my-studios/${studioId}/clients`)
+}
+
+// Flatten nested structure for form
+const reca = (client.reca_client_data as any)?.[0] || {}
+const apps = (client.apps as string[]) || []
+const flattenedClient = {
+  id: client.id,
+  name: client.name,
+  cuit: client.cuit,
+  uses_recablix: apps.includes('recablix'),
+  activity: reca.activity || 'SERVICIOS',
+  province_code: reca.province_code || '901',
+  works_in_rd: reca.works_in_rd || false,
+  is_retired: reca.is_retired || false,
+  dependents: reca.dependents || 0,
+  local_m2: reca.local_m2,
+  annual_rent: reca.annual_rent,
+  annual_mw: reca.annual_mw,
+  previous_category: reca.previous_category,
+  previous_fee: reca.previous_fee,
+  is_exempt: reca.is_exempt || false,
+  has_multilateral: reca.has_multilateral || false,
+  has_local: reca.has_local || false,
+  is_rented: reca.is_rented || false,
+  landlord_cuit: reca.landlord_cuit || null,
+}
+
+const returnUrl = `/admin/my-studios/${studioId}/clients`
+---
+
+<AdminLayout title={`Editar: ${client.name}`}>
+  <div class="space-y-6">
+    <div class="flex items-center gap-4">
+      <a href={returnUrl} class="text-muted-foreground hover:text-foreground">
+        &larr; Volver a clientes
+      </a>
+      <span class="text-muted-foreground">|</span>
+      <span class="text-sm text-muted-foreground">{studio.name}</span>
+    </div>
+    <h1 class="text-2xl font-bold">Editar Cliente</h1>
+    <ClientForm
+      client:load
+      initialData={flattenedClient}
+      studioId={studioId}
+      schemaName={schemaName}
+      returnUrl={returnUrl}
+    />
+  </div>
+</AdminLayout>
