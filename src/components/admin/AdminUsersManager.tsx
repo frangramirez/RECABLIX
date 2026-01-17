@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -26,7 +27,13 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Search, Shield, Building2, User, UserPlus, Mail, Eye, EyeOff, Plus, Trash2 } from 'lucide-react'
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import { Search, Shield, Building2, User, UserPlus, Mail, Eye, EyeOff, Plus, Trash2, ChevronDown, ChevronRight, Key, Calendar, Clock, Settings, Pencil } from 'lucide-react'
 import { toast } from 'sonner'
 import type { UserWithRoles } from '@/pages/api/admin/users'
 import type {
@@ -52,9 +59,30 @@ export function AdminUsersManager() {
   const [filterType, setFilterType] = useState<FilterType>('all')
   const [selectedStudio, setSelectedStudio] = useState<string>('')
   const [studios, setStudios] = useState<Studio[]>([])
-  const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null)
   const [studiosError, setStudiosError] = useState<string | null>(null)
   const [studiosLoading, setStudiosLoading] = useState(false)
+
+  // Estado para fila expandida con acordeón
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
+
+  // Estado para contraseña inline
+  const [passwordForUserId, setPasswordForUserId] = useState<string | null>(null)
+  const [userPassword, setUserPassword] = useState('')
+  const [showUserPassword, setShowUserPassword] = useState(false)
+  const [isSettingUserPassword, setIsSettingUserPassword] = useState(false)
+
+  // Estado para cambio de rol
+  const [changingRoleFor, setChangingRoleFor] = useState<string | null>(null)
+
+  // Estado para edición de permisos
+  const [editingMembership, setEditingMembership] = useState<{
+    membership_id: string
+    studio_name: string
+    role: string
+    permissions: Record<string, boolean>
+  } | null>(null)
+  const [editedPermissions, setEditedPermissions] = useState<Record<string, boolean>>({})
+  const [isSavingPermissions, setIsSavingPermissions] = useState(false)
 
   // Dialog de invitación
   const [showInviteDialog, setShowInviteDialog] = useState(false)
@@ -311,6 +339,149 @@ export function AdminUsersManager() {
     }
   }
 
+  // Handlers para acordeón expandido
+  async function handleSetUserPassword(userId: string) {
+    if (!userPassword || userPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+
+    setIsSettingUserPassword(true)
+    try {
+      const response = await fetch('/api/admin/user-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, password: userPassword }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al establecer contraseña')
+      }
+
+      toast.success('Contraseña actualizada')
+      setUserPassword('')
+      setShowUserPassword(false)
+      setPasswordForUserId(null)
+    } catch (error) {
+      console.error('Error setting password:', error)
+      const message = error instanceof Error ? error.message : 'Error al establecer contraseña'
+      toast.error(message)
+    } finally {
+      setIsSettingUserPassword(false)
+    }
+  }
+
+  async function handleToggleSuperadmin(userId: string, currentStatus: boolean) {
+    const action = currentStatus ? 'remove' : 'add'
+    if (!confirm(`¿${action === 'add' ? 'Hacer' : 'Quitar'} SuperAdmin a este usuario?`)) return
+
+    try {
+      const response = await fetch('/api/admin/superadmins', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId, action }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success(action === 'add' ? 'Usuario ahora es SuperAdmin' : 'SuperAdmin removido')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error toggling superadmin:', error)
+      toast.error('Error al cambiar estado de SuperAdmin')
+    }
+  }
+
+  async function handleRoleChange(membershipId: string, newRole: string) {
+    setChangingRoleFor(membershipId)
+    try {
+      const response = await fetch(`/api/studio/members/${membershipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success('Rol actualizado')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error changing role:', error)
+      toast.error('Error al cambiar rol')
+    } finally {
+      setChangingRoleFor(null)
+    }
+  }
+
+  async function handleDeleteMembership(membershipId: string, studioName: string) {
+    if (!confirm(`¿Eliminar membresía de "${studioName}"?`)) return
+
+    try {
+      const response = await fetch(`/api/studio/members/${membershipId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success('Membresía eliminada')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error deleting membership:', error)
+      toast.error('Error al eliminar membresía')
+    }
+  }
+
+  async function handleSavePermissions() {
+    if (!editingMembership) return
+
+    setIsSavingPermissions(true)
+    try {
+      const response = await fetch(`/api/studio/members/${editingMembership.membership_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions: editedPermissions }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success('Permisos actualizados')
+      setEditingMembership(null)
+      fetchUsers()
+    } catch (error) {
+      console.error('Error updating permissions:', error)
+      toast.error('Error al actualizar permisos')
+    } finally {
+      setIsSavingPermissions(false)
+    }
+  }
+
+  const PERMISSION_CONFIGS = [
+    { key: 'can_view_billing', label: 'Ver Facturación' },
+    { key: 'can_manage_subscriptions', label: 'Gestionar Suscripciones' },
+    { key: 'can_delete_members', label: 'Eliminar Miembros' },
+    { key: 'can_delete_clients', label: 'Eliminar Clientes' },
+    { key: 'can_export_data', label: 'Exportar Datos' },
+    { key: 'can_import_data', label: 'Importar Datos' },
+    { key: 'can_generate_reports', label: 'Generar Reportes' },
+  ] as const
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -390,11 +561,12 @@ export function AdminUsersManager() {
         {filterType !== 'all' && ` (de ${users.length} total)`}
       </p>
 
-      {/* Tabla */}
+      {/* Tabla con filas expandibles */}
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8"></TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Nombre</TableHead>
               <TableHead>Estudio</TableHead>
@@ -406,7 +578,7 @@ export function AdminUsersManager() {
           <TableBody>
             {filteredUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
+                <TableCell colSpan={7} className="text-center py-8">
                   <p className="text-muted-foreground">
                     {searchTerm || filterType !== 'all'
                       ? 'No hay usuarios que coincidan con los filtros.'
@@ -415,109 +587,291 @@ export function AdminUsersManager() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredUsers.map((user) => (
-                <TableRow
-                  key={user.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => setSelectedUser(user)}
-                >
-                  <TableCell className="font-medium">{user.email}</TableCell>
-                  <TableCell className="text-muted-foreground">{user.name || '-'}</TableCell>
-                  <TableCell>
-                    {user.studios.length === 0 ? (
-                      <span className="text-muted-foreground">Sin estudio</span>
-                    ) : user.studios.length === 1 ? (
-                      <div className="flex items-center gap-1">
-                        <Building2 className="h-3 w-3 text-muted-foreground" />
-                        <span>{user.studios[0].studio_name}</span>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">{user.studios.length} estudios</Badge>
+              filteredUsers.map((user) => {
+                const isExpanded = expandedUserId === user.id
+                return (
+                  <>
+                    <TableRow
+                      key={user.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setExpandedUserId(isExpanded ? null : user.id)}
+                    >
+                      <TableCell className="w-8">
+                        {isExpanded ? (
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">{user.email}</TableCell>
+                      <TableCell className="text-muted-foreground">{user.name || '-'}</TableCell>
+                      <TableCell>
+                        {user.studios.length === 0 ? (
+                          <span className="text-muted-foreground">Sin estudio</span>
+                        ) : user.studios.length === 1 ? (
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3 text-muted-foreground" />
+                            <span>{user.studios[0].studio_name}</span>
+                          </div>
+                        ) : (
+                          <Badge variant="outline">{user.studios.length} estudios</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.studios.length === 0 ? (
+                          '-'
+                        ) : user.studios.length === 1 ? (
+                          <Badge variant={getRoleBadgeVariant(user.studios[0].role)}>
+                            {user.studios[0].role}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">(ver detalle)</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {user.is_superadmin && <Shield className="h-4 w-4 mx-auto text-amber-500" />}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(user.last_sign_in_at)}
+                      </TableCell>
+                    </TableRow>
+
+                    {/* Fila expandida con acordeón */}
+                    {isExpanded && (
+                      <TableRow key={`${user.id}-expanded`}>
+                        <TableCell colSpan={7} className="p-0 bg-muted/30">
+                          <div className="p-4">
+                            <Accordion type="multiple" defaultValue={["info", "memberships"]} className="w-full">
+                              {/* Información del usuario */}
+                              <AccordionItem value="info" className="border-b-0">
+                                <AccordionTrigger className="py-2 hover:no-underline">
+                                  <div className="flex items-center gap-2">
+                                    <User className="h-4 w-4" />
+                                    <span>Información</span>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="space-y-3 pt-2">
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                      <div className="flex items-center gap-2">
+                                        <Mail className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Email:</span>
+                                        <span className="font-medium">{user.email}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Registrado:</span>
+                                        <span>{formatDate(user.created_at)}</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-muted-foreground">Último login:</span>
+                                        <span>{formatDate(user.last_sign_in_at)}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 pt-2">
+                                      <Shield className="h-4 w-4 text-amber-500" />
+                                      <span className="text-sm">SuperAdmin</span>
+                                      <Switch
+                                        checked={user.is_superadmin}
+                                        onCheckedChange={() => handleToggleSuperadmin(user.id, user.is_superadmin)}
+                                      />
+                                    </div>
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+
+                              {/* Contraseña */}
+                              <AccordionItem value="password" className="border-b-0">
+                                <AccordionTrigger className="py-2 hover:no-underline">
+                                  <div className="flex items-center gap-2">
+                                    <Key className="h-4 w-4" />
+                                    <span>Contraseña</span>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="pt-2">
+                                    {passwordForUserId === user.id ? (
+                                      <div className="flex items-center gap-2">
+                                        <div className="relative flex-1 max-w-xs">
+                                          <Input
+                                            type={showUserPassword ? 'text' : 'password'}
+                                            placeholder="Nueva contraseña (min 6 caracteres)"
+                                            value={userPassword}
+                                            onChange={(e) => setUserPassword(e.target.value)}
+                                            className="pr-10"
+                                          />
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="absolute right-0 top-0 h-full px-3"
+                                            onClick={() => setShowUserPassword(!showUserPassword)}
+                                          >
+                                            {showUserPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                          </Button>
+                                        </div>
+                                        <Button
+                                          size="sm"
+                                          onClick={() => handleSetUserPassword(user.id)}
+                                          disabled={isSettingUserPassword || userPassword.length < 6}
+                                        >
+                                          {isSettingUserPassword ? 'Guardando...' : 'Guardar'}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => {
+                                            setPasswordForUserId(null)
+                                            setUserPassword('')
+                                            setShowUserPassword(false)
+                                          }}
+                                        >
+                                          Cancelar
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setPasswordForUserId(user.id)}
+                                      >
+                                        <Key className="h-4 w-4 mr-2" />
+                                        Asignar nueva contraseña
+                                      </Button>
+                                    )}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+
+                              {/* Membresías */}
+                              <AccordionItem value="memberships" className="border-b-0">
+                                <AccordionTrigger className="py-2 hover:no-underline">
+                                  <div className="flex items-center gap-2">
+                                    <Building2 className="h-4 w-4" />
+                                    <span>Membresías ({user.studios.length})</span>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <div className="space-y-2 pt-2">
+                                    {user.studios.length === 0 ? (
+                                      <p className="text-sm text-muted-foreground">Sin membresías</p>
+                                    ) : (
+                                      user.studios.map((studio) => (
+                                        <div
+                                          key={studio.membership_id}
+                                          className="flex items-center justify-between p-3 rounded-md border bg-background"
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                                            <span className="font-medium">{studio.studio_name}</span>
+                                          </div>
+                                          <div className="flex items-center gap-2">
+                                            {studio.role === 'owner' ? (
+                                              <Badge variant="default">owner</Badge>
+                                            ) : (
+                                              <Select
+                                                value={studio.role}
+                                                onValueChange={(value) => handleRoleChange(studio.membership_id, value)}
+                                                disabled={changingRoleFor === studio.membership_id}
+                                              >
+                                                <SelectTrigger className="w-[130px] h-8">
+                                                  <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                  <SelectItem value="admin">admin</SelectItem>
+                                                  <SelectItem value="collaborator">collaborator</SelectItem>
+                                                  <SelectItem value="client">client</SelectItem>
+                                                </SelectContent>
+                                              </Select>
+                                            )}
+                                            {studio.role !== 'owner' && studio.role !== 'admin' && (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  setEditingMembership({
+                                                    membership_id: studio.membership_id,
+                                                    studio_name: studio.studio_name,
+                                                    role: studio.role,
+                                                    permissions: studio.permissions || {}
+                                                  })
+                                                  setEditedPermissions(studio.permissions || {})
+                                                }}
+                                              >
+                                                <Settings className="h-3 w-3" />
+                                              </Button>
+                                            )}
+                                            {studio.role !== 'owner' && (
+                                              <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-destructive hover:text-destructive"
+                                                onClick={(e) => {
+                                                  e.stopPropagation()
+                                                  handleDeleteMembership(studio.membership_id, studio.studio_name)
+                                                }}
+                                              >
+                                                <Trash2 className="h-3 w-3" />
+                                              </Button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))
+                                    )}
+                                  </div>
+                                </AccordionContent>
+                              </AccordionItem>
+                            </Accordion>
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {user.studios.length === 0 ? (
-                      '-'
-                    ) : user.studios.length === 1 ? (
-                      <Badge variant={getRoleBadgeVariant(user.studios[0].role)}>
-                        {user.studios[0].role}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">(ver detalle)</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {user.is_superadmin && <Shield className="h-4 w-4 mx-auto text-amber-500" />}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(user.last_sign_in_at)}
-                  </TableCell>
-                </TableRow>
-              ))
+                  </>
+                )
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Dialog detalle usuario */}
-      <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+      {/* Dialog editar permisos */}
+      <Dialog open={!!editingMembership} onOpenChange={() => setEditingMembership(null)}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Detalle de Usuario
+              <Settings className="h-5 w-5" />
+              Editar Permisos
             </DialogTitle>
-            <DialogDescription>Informacion del usuario y sus membresías</DialogDescription>
+            <DialogDescription>
+              {editingMembership?.studio_name} - Rol: {editingMembership?.role}
+            </DialogDescription>
           </DialogHeader>
 
-          {selectedUser && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Email:</span>
-                  <span className="font-medium">{selectedUser.email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Nombre:</span>
-                  <span>{selectedUser.name || '-'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">SuperAdmin:</span>
-                  <span>
-                    {selectedUser.is_superadmin ? <Badge className="bg-amber-500">Si</Badge> : 'No'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Ultimo login:</span>
-                  <span className="text-sm">{formatDate(selectedUser.last_sign_in_at)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-muted-foreground">Registrado:</span>
-                  <span className="text-sm">{formatDate(selectedUser.created_at)}</span>
-                </div>
+          <div className="space-y-4">
+            {PERMISSION_CONFIGS.map((perm) => (
+              <div key={perm.key} className="flex items-center justify-between">
+                <Label htmlFor={perm.key}>{perm.label}</Label>
+                <Switch
+                  id={perm.key}
+                  checked={editedPermissions[perm.key] || false}
+                  onCheckedChange={(checked) =>
+                    setEditedPermissions({ ...editedPermissions, [perm.key]: checked })
+                  }
+                />
               </div>
+            ))}
+          </div>
 
-              {selectedUser.studios.length > 0 && (
-                <div className="border-t pt-4">
-                  <h4 className="font-medium mb-2">Membresías ({selectedUser.studios.length})</h4>
-                  <div className="space-y-2">
-                    {selectedUser.studios.map((studio) => (
-                      <div
-                        key={studio.studio_id}
-                        className="flex items-center justify-between p-2 rounded-md bg-muted/50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          <span>{studio.studio_name}</span>
-                        </div>
-                        <Badge variant={getRoleBadgeVariant(studio.role)}>{studio.role}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingMembership(null)} disabled={isSavingPermissions}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSavePermissions} disabled={isSavingPermissions}>
+              {isSavingPermissions ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
