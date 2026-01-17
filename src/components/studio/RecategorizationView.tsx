@@ -37,6 +37,19 @@ interface Props {
 
 type ChangeFilter = 'all' | 'UP' | 'DOWN' | 'SAME' | 'NEW'
 
+/**
+ * Normalizes period format to YYYYMM.
+ * Handles both YYYY-MM-DD and YYYYMM formats defensively.
+ */
+function normalizeToYYYYMM(period: string): string {
+  // If it's YYYY-MM-DD format (e.g., "2025-07-01"), convert to YYYYMM
+  if (period.includes('-') && period.length === 10) {
+    return period.substring(0, 4) + period.substring(5, 7)
+  }
+  // Already in YYYYMM format or other format, return as-is
+  return period
+}
+
 export function RecategorizationView({
   studioId,
   recaId,
@@ -109,12 +122,16 @@ export function RecategorizationView({
       }
 
       // 2. Obtener TODAS las transacciones del período en UNA query
+      // Normalize period format: convert YYYY-MM-DD to YYYYMM if needed
+      const normalizedStart = normalizeToYYYYMM(salesPeriodStart)
+      const normalizedEnd = normalizeToYYYYMM(salesPeriodEnd)
+
       const clientIds = clientsWithData.map(c => c.id)
       const { data: allTx, error: txError } = await query('reca_transactions')
         .select('client_id, transaction_type, amount')
         .in('client_id', clientIds)
-        .gte('period', salesPeriodStart)
-        .lte('period', salesPeriodEnd)
+        .gte('period', normalizedStart)
+        .lte('period', normalizedEnd)
 
       if (txError) {
         toast.error('Error al cargar transacciones', { description: txError.message })
@@ -124,21 +141,27 @@ export function RecategorizationView({
 
       // 3. Agrupar transacciones por cliente en memoria
       const salesByClient = new Map<string, number>()
+      const purchasesByClient = new Map<string, number>()
       allTx?.forEach(tx => {
         if (tx.transaction_type === 'SALE') {
           const current = salesByClient.get(tx.client_id) || 0
           salesByClient.set(tx.client_id, current + Number(tx.amount))
+        } else if (tx.transaction_type === 'PURCHASE') {
+          const current = purchasesByClient.get(tx.client_id) || 0
+          purchasesByClient.set(tx.client_id, current + Number(tx.amount))
         }
       })
 
-      // DEBUG: Log ventas por cliente para diagnóstico
+      // DEBUG: Log para diagnóstico de cálculo
       if (process.env.NODE_ENV === 'development') {
+        console.log('[RECA DEBUG] Períodos:', { original: { salesPeriodStart, salesPeriodEnd }, normalized: { normalizedStart, normalizedEnd } })
         console.log('[RECA DEBUG] Transacciones cargadas:', allTx?.length)
-        console.log('[RECA DEBUG] Clientes con ventas:', salesByClient.size)
+        console.log('[RECA DEBUG] Clientes con ventas:', salesByClient.size, '| con compras:', purchasesByClient.size)
         salesByClient.forEach((sales, clientId) => {
           const client = clientsWithData.find(c => c.id === clientId)
-          if (sales > 50_000_000) {
-            console.log(`[RECA DEBUG] ${client?.name || clientId}: $${sales.toLocaleString()}`)
+          const purchases = purchasesByClient.get(clientId) || 0
+          if (sales > 50_000_000 || purchases > 50_000_000) {
+            console.log(`[RECA DEBUG] ${client?.name || clientId}: ventas=$${sales.toLocaleString()}, compras=$${purchases.toLocaleString()}`)
           }
         })
       }
@@ -176,6 +199,7 @@ export function RecategorizationView({
           annualRent: reca.annual_rent || null,
           annualMW: reca.annual_mw || null,
           periodSales: salesByClient.get(client.id) || 0,
+          periodPurchases: purchasesByClient.get(client.id) || 0,
           previousCategory: reca.previous_category || null,
           previousFee: reca.previous_fee || null,
         }
@@ -187,6 +211,7 @@ export function RecategorizationView({
               name: clientData.name,
               id: clientData.id,
               periodSales: clientData.periodSales,
+              periodPurchases: clientData.periodPurchases,
               activity: clientData.activity,
             })
           }

@@ -42,6 +42,8 @@ export interface ClientData {
   annualRent: number | null
   annualMW: number | null
   periodSales: number
+  /** Compras del período (informativo, no se usa para categorización) */
+  periodPurchases?: number
   previousCategory: string | null
   previousFee: number | null
   /** Cliente exento de IIBB (Provincia = "EX") */
