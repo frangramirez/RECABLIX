@@ -48,8 +48,12 @@ import {
   Mail,
   Calendar,
   Clock,
+  Key,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { toast } from 'sonner'
+import type { SetPasswordRequest, SetPasswordResponse } from '@/types/subscription'
 
 interface UserData {
   id: string
@@ -100,6 +104,12 @@ export function UserDetailManager({ userId }: Props) {
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [newStudioId, setNewStudioId] = useState('')
   const [newRole, setNewRole] = useState<'admin' | 'collaborator' | 'client'>('collaborator')
+
+  // Dialog de asignar contraseña
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [isSettingPassword, setIsSettingPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     fetchUser()
@@ -253,6 +263,47 @@ export function UserDetailManager({ userId }: Props) {
     }
   }
 
+  async function handleSetPassword() {
+    if (!user || !newPassword) return
+
+    if (newPassword.length < 6) {
+      toast.error('La contraseña debe tener al menos 6 caracteres')
+      return
+    }
+
+    setIsSettingPassword(true)
+
+    try {
+      const request: SetPasswordRequest = {
+        user_id: user.id,
+        password: newPassword,
+      }
+
+      const response = await fetch('/api/admin/user-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      })
+
+      const data: SetPasswordResponse = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al establecer contraseña')
+      }
+
+      toast.success('Contraseña actualizada exitosamente')
+      setShowPasswordDialog(false)
+      setNewPassword('')
+      setShowPassword(false)
+    } catch (error) {
+      console.error('Error setting password:', error)
+      const message = error instanceof Error ? error.message : 'Error al establecer contraseña'
+      toast.error(message)
+    } finally {
+      setIsSettingPassword(false)
+    }
+  }
+
   function formatDate(dateString: string | null) {
     if (!dateString) return 'Nunca'
     return new Date(dateString).toLocaleDateString('es-AR', {
@@ -340,7 +391,7 @@ export function UserDetailManager({ userId }: Props) {
               <Clock className="h-4 w-4 text-muted-foreground" />
               <span>Último login: {formatDate(user.last_sign_in_at)}</span>
             </div>
-            <div className="border-t pt-4">
+            <div className="border-t pt-4 space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4 text-amber-500" />
@@ -351,9 +402,21 @@ export function UserDetailManager({ userId }: Props) {
                   onCheckedChange={handleToggleSuperadmin}
                 />
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-xs text-muted-foreground">
                 Los SuperAdmin tienen acceso completo al sistema.
               </p>
+
+              <div className="border-t pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setShowPasswordDialog(true)}
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  Asignar Contraseña
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -525,6 +588,70 @@ export function UserDetailManager({ userId }: Props) {
             </Button>
             <Button onClick={handleAddToStudio} disabled={isSaving || !newStudioId}>
               {isSaving ? 'Agregando...' : 'Agregar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de asignar contraseña */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              Asignar Contraseña
+            </DialogTitle>
+            <DialogDescription>
+              Establece una nueva contraseña para {user?.email}.
+              El usuario no recibirá notificación.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">Nueva Contraseña</Label>
+              <div className="relative">
+                <Input
+                  id="new-password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Mínimo 6 caracteres"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                La contraseña debe tener al menos 6 caracteres.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPasswordDialog(false)
+                setNewPassword('')
+                setShowPassword(false)
+              }}
+              disabled={isSettingPassword}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSetPassword}
+              disabled={isSettingPassword || newPassword.length < 6}
+            >
+              {isSettingPassword ? 'Guardando...' : 'Guardar'}
             </Button>
           </DialogFooter>
         </DialogContent>

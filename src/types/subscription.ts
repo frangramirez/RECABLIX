@@ -79,3 +79,44 @@ export class SubscriptionLimitError extends Error {
     this.name = 'SubscriptionLimitError';
   }
 }
+
+/**
+ * Request para crear usuario directamente (sin enviar email de invitación)
+ */
+export interface CreateUserRequest {
+  email: string;
+  password: string;
+  name?: string;
+  studios?: Array<{
+    studio_id: string;
+    role: Exclude<StudioMemberRole, 'owner'>;
+  }>;
+}
+
+/**
+ * Respuesta de creación de usuario
+ */
+export interface CreateUserResponse {
+  success: boolean;
+  user_id?: string;
+  memberships_created?: number;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Request para establecer/cambiar contraseña de usuario
+ */
+export interface SetPasswordRequest {
+  user_id: string;
+  password: string;
+}
+
+/**
+ * Respuesta de establecer contraseña
+ */
+export interface SetPasswordResponse {
+  success: boolean;
+  message?: string;
+  error?: string;
+}
