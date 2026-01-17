@@ -14,11 +14,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion'
+import {
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
 } from '@/components/ui/card'
 import {
   Dialog,
@@ -96,8 +99,9 @@ export function UserDetailManager({ userId }: Props) {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
 
-  // Dialog de editar permisos
+  // Dialog de editar membresía (rol + permisos)
   const [editingMembership, setEditingMembership] = useState<UserData['studios'][0] | null>(null)
+  const [editedRole, setEditedRole] = useState<string>('')
   const [editedPermissions, setEditedPermissions] = useState<Record<string, boolean>>({})
 
   // Dialog de agregar a studio
@@ -105,8 +109,7 @@ export function UserDetailManager({ userId }: Props) {
   const [newStudioId, setNewStudioId] = useState('')
   const [newRole, setNewRole] = useState<'admin' | 'collaborator' | 'client'>('collaborator')
 
-  // Dialog de asignar contraseña
-  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  // Sección de contraseña (inline en accordion)
   const [newPassword, setNewPassword] = useState('')
   const [isSettingPassword, setIsSettingPassword] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
@@ -152,15 +155,27 @@ export function UserDetailManager({ userId }: Props) {
     }
   }
 
-  async function handleSavePermissions() {
+  async function handleSaveMembership() {
     if (!editingMembership) return
 
     setIsSaving(true)
     try {
+      const updatePayload: { role?: string; permissions?: Record<string, boolean> } = {}
+
+      // Solo enviar rol si cambió y no es owner
+      if (editedRole && editedRole !== editingMembership.role) {
+        updatePayload.role = editedRole
+      }
+
+      // Solo enviar permisos si el rol no es admin
+      if (editedRole !== 'admin') {
+        updatePayload.permissions = editedPermissions
+      }
+
       const response = await fetch(`/api/studio/members/${editingMembership.membership_id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ permissions: editedPermissions }),
+        body: JSON.stringify(updatePayload),
       })
 
       const data = await response.json()
@@ -169,12 +184,13 @@ export function UserDetailManager({ userId }: Props) {
         return
       }
 
-      toast.success('Permisos actualizados')
+      toast.success('Membresía actualizada')
       setEditingMembership(null)
+      setEditedRole('')
       fetchUser()
     } catch (error) {
-      console.error('Error updating permissions:', error)
-      toast.error('Error al actualizar permisos')
+      console.error('Error updating membership:', error)
+      toast.error('Error al actualizar membresía')
     } finally {
       setIsSaving(false)
     }
@@ -292,7 +308,6 @@ export function UserDetailManager({ userId }: Props) {
       }
 
       toast.success('Contraseña actualizada exitosamente')
-      setShowPasswordDialog(false)
       setNewPassword('')
       setShowPassword(false)
     } catch (error) {
@@ -369,170 +384,255 @@ export function UserDetailManager({ userId }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Información básica */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Información
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-3">
-              <Mail className="h-4 w-4 text-muted-foreground" />
-              <span>{user.email}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span>Registrado: {formatDate(user.created_at)}</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <Clock className="h-4 w-4 text-muted-foreground" />
-              <span>Último login: {formatDate(user.last_sign_in_at)}</span>
-            </div>
-            <div className="border-t pt-4 space-y-4">
-              <div className="flex items-center justify-between">
+      {/* Accordion Content */}
+      <Card>
+        <CardContent className="pt-6">
+          <Accordion type="multiple" defaultValue={['info', 'memberships']}>
+            {/* Información */}
+            <AccordionItem value="info">
+              <AccordionTrigger className="text-base font-medium">
                 <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-amber-500" />
-                  <span>SuperAdmin</span>
+                  <User className="h-5 w-5" />
+                  Información
                 </div>
-                <Switch
-                  checked={user.is_superadmin}
-                  onCheckedChange={handleToggleSuperadmin}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Los SuperAdmin tienen acceso completo al sistema.
-              </p>
-
-              <div className="border-t pt-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full"
-                  onClick={() => setShowPasswordDialog(true)}
-                >
-                  <Key className="h-4 w-4 mr-2" />
-                  Asignar Contraseña
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Membresías */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Building2 className="h-5 w-5" />
-                Membresías ({user.studios.length})
-              </div>
-              {availableStudios.length > 0 && (
-                <Button size="sm" variant="outline" onClick={() => setShowAddDialog(true)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Agregar
-                </Button>
-              )}
-            </CardTitle>
-            <CardDescription>
-              Estudios a los que pertenece este usuario.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {user.studios.length === 0 ? (
-              <p className="text-muted-foreground text-center py-4">
-                Sin membresías
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {user.studios.map((studio) => (
-                  <div
-                    key={studio.studio_id}
-                    className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                  >
-                    <div>
-                      <div className="font-medium">{studio.studio_name}</div>
-                      <Badge variant="outline" className={getRoleBadgeColor(studio.role)}>
-                        {studio.role}
-                      </Badge>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span>{user.email}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>Registrado: {formatDate(user.created_at)}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span>Último login: {formatDate(user.last_sign_in_at)}</span>
+                  </div>
+                  <div className="border-t pt-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-amber-500" />
+                        <span>SuperAdmin</span>
+                      </div>
+                      <Switch
+                        checked={user.is_superadmin}
+                        onCheckedChange={handleToggleSuperadmin}
+                      />
                     </div>
-                    {studio.role !== 'owner' && (
-                      <div className="flex gap-1">
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Los SuperAdmin tienen acceso completo al sistema.
+                    </p>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            {/* Contraseña */}
+            <AccordionItem value="password">
+              <AccordionTrigger className="text-base font-medium">
+                <div className="flex items-center gap-2">
+                  <Key className="h-5 w-5" />
+                  Contraseña
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  <p className="text-sm text-muted-foreground">
+                    Establece una nueva contraseña para este usuario. El usuario no recibirá notificación.
+                  </p>
+                  <div className="space-y-2">
+                    <Label htmlFor="new-password">Nueva Contraseña</Label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Input
+                          id="new-password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Mínimo 6 caracteres"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="pr-10"
+                        />
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setEditingMembership(studio)
-                            setEditedPermissions(studio.permissions || {})
-                          }}
+                          className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
                         >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteMembership(studio.membership_id, studio.studio_name)}
-                        >
-                          <Trash2 className="h-4 w-4" />
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </Button>
                       </div>
-                    )}
+                      <Button
+                        onClick={handleSetPassword}
+                        disabled={isSettingPassword || newPassword.length < 6}
+                      >
+                        {isSettingPassword ? 'Guardando...' : 'Guardar'}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      La contraseña debe tener al menos 6 caracteres.
+                    </p>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-      {/* Dialog de editar permisos */}
-      <Dialog open={!!editingMembership} onOpenChange={() => setEditingMembership(null)}>
+            {/* Membresías */}
+            <AccordionItem value="memberships">
+              <AccordionTrigger className="text-base font-medium">
+                <div className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Membresías ({user.studios.length})
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-4 pt-2">
+                  {availableStudios.length > 0 && (
+                    <Button size="sm" variant="outline" onClick={() => setShowAddDialog(true)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Agregar a Studio
+                    </Button>
+                  )}
+
+                  {user.studios.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-4">
+                      Sin membresías
+                    </p>
+                  ) : (
+                    <div className="space-y-3">
+                      {user.studios.map((studio) => (
+                        <div
+                          key={studio.studio_id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <div className="font-medium">{studio.studio_name}</div>
+                              <Badge variant="outline" className={getRoleBadgeColor(studio.role)}>
+                                {studio.role}
+                              </Badge>
+                            </div>
+                          </div>
+                          {studio.role !== 'owner' && (
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingMembership(studio)
+                                  setEditedRole(studio.role)
+                                  setEditedPermissions(studio.permissions || {})
+                                }}
+                                title="Editar membresía"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteMembership(studio.membership_id, studio.studio_name)}
+                                title="Eliminar membresía"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          )}
+                          {studio.role === 'owner' && (
+                            <span className="text-xs text-muted-foreground">Owner no editable</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </CardContent>
+      </Card>
+
+      {/* Dialog de editar membresía (rol + permisos) */}
+      <Dialog
+        open={!!editingMembership}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingMembership(null)
+            setEditedRole('')
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Editar Permisos
+              Editar Membresía
             </DialogTitle>
             <DialogDescription>
-              {editingMembership?.studio_name} - {editingMembership?.role}
+              {editingMembership?.studio_name}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            {editingMembership?.role === 'admin' ? (
-              <p className="text-sm text-muted-foreground">
+          <div className="space-y-4 py-2">
+            {/* Selector de Rol */}
+            <div className="space-y-2">
+              <Label>Rol</Label>
+              <Select
+                value={editedRole}
+                onValueChange={setEditedRole}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Administrador</SelectItem>
+                  <SelectItem value="collaborator">Colaborador</SelectItem>
+                  <SelectItem value="client">Cliente</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
                 Los administradores tienen todos los permisos automáticamente.
               </p>
-            ) : (
-              PERMISSION_CONFIGS.map((config) => (
-                <div key={config.key} className="flex items-center justify-between">
-                  <Label htmlFor={config.key} className="cursor-pointer">
-                    {config.label}
-                  </Label>
-                  <Switch
-                    id={config.key}
-                    checked={editedPermissions[config.key] || false}
-                    onCheckedChange={(checked) =>
-                      setEditedPermissions((prev) => ({ ...prev, [config.key]: checked }))
-                    }
-                  />
-                </div>
-              ))
+            </div>
+
+            {/* Permisos (solo si no es admin) */}
+            {editedRole !== 'admin' && (
+              <div className="space-y-3 border-t pt-4">
+                <Label className="text-sm font-medium">Permisos</Label>
+                {PERMISSION_CONFIGS.map((config) => (
+                  <div key={config.key} className="flex items-center justify-between">
+                    <Label htmlFor={config.key} className="cursor-pointer font-normal">
+                      {config.label}
+                    </Label>
+                    <Switch
+                      id={config.key}
+                      checked={editedPermissions[config.key] || false}
+                      onCheckedChange={(checked) =>
+                        setEditedPermissions((prev) => ({ ...prev, [config.key]: checked }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
             )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingMembership(null)} disabled={isSaving}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditingMembership(null)
+                setEditedRole('')
+              }}
+              disabled={isSaving}
+            >
               Cancelar
             </Button>
-            {editingMembership?.role !== 'admin' && (
-              <Button onClick={handleSavePermissions} disabled={isSaving}>
-                {isSaving ? 'Guardando...' : 'Guardar'}
-              </Button>
-            )}
+            <Button onClick={handleSaveMembership} disabled={isSaving}>
+              {isSaving ? 'Guardando...' : 'Guardar'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -588,70 +688,6 @@ export function UserDetailManager({ userId }: Props) {
             </Button>
             <Button onClick={handleAddToStudio} disabled={isSaving || !newStudioId}>
               {isSaving ? 'Agregando...' : 'Agregar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog de asignar contraseña */}
-      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5" />
-              Asignar Contraseña
-            </DialogTitle>
-            <DialogDescription>
-              Establece una nueva contraseña para {user?.email}.
-              El usuario no recibirá notificación.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="new-password">Nueva Contraseña</Label>
-              <div className="relative">
-                <Input
-                  id="new-password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="Mínimo 6 caracteres"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="pr-10"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                La contraseña debe tener al menos 6 caracteres.
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowPasswordDialog(false)
-                setNewPassword('')
-                setShowPassword(false)
-              }}
-              disabled={isSettingPassword}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleSetPassword}
-              disabled={isSettingPassword || newPassword.length < 6}
-            >
-              {isSettingPassword ? 'Guardando...' : 'Guardar'}
             </Button>
           </DialogFooter>
         </DialogContent>
