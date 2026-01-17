@@ -23,11 +23,44 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Shield, Building2, User } from 'lucide-react'
+import { Search, Shield, Building2, User, Pencil, Trash2, Settings } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
+import {
+  DialogFooter,
+} from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import type { UserWithRoles } from '@/pages/api/admin/users'
 
 type FilterType = 'all' | 'superadmins' | 'studio'
+
+interface MembershipPermissions {
+  can_view_billing?: boolean
+  can_manage_subscriptions?: boolean
+  can_delete_members?: boolean
+  can_delete_clients?: boolean
+  can_export_data?: boolean
+  can_import_data?: boolean
+  can_generate_reports?: boolean
+}
+
+interface EditingMembership {
+  membership_id: string
+  studio_name: string
+  role: string
+  permissions: MembershipPermissions
+}
+
+const PERMISSION_CONFIGS = [
+  { key: 'can_view_billing' as const, label: 'Ver Facturación' },
+  { key: 'can_manage_subscriptions' as const, label: 'Gestionar Suscripciones' },
+  { key: 'can_delete_members' as const, label: 'Eliminar Miembros' },
+  { key: 'can_delete_clients' as const, label: 'Eliminar Clientes' },
+  { key: 'can_export_data' as const, label: 'Exportar Datos' },
+  { key: 'can_import_data' as const, label: 'Importar Datos' },
+  { key: 'can_generate_reports' as const, label: 'Generar Reportes' },
+]
 
 export function UsersTab() {
   const [users, setUsers] = useState<UserWithRoles[]>([])
@@ -38,6 +71,11 @@ export function UsersTab() {
   const [selectedStudio, setSelectedStudio] = useState<string>('')
   const [studios, setStudios] = useState<{ id: string; name: string }[]>([])
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null)
+
+  // Estado para edición de permisos
+  const [editingMembership, setEditingMembership] = useState<EditingMembership | null>(null)
+  const [editedPermissions, setEditedPermissions] = useState<MembershipPermissions>({})
+  const [isSaving, setIsSaving] = useState(false)
 
   useEffect(() => {
     fetchUsers()
@@ -121,6 +159,68 @@ export function UsersTab() {
         return 'secondary'
       default:
         return 'outline'
+    }
+  }
+
+  function openEditPermissions(studio: UserWithRoles['studios'][0]) {
+    setEditingMembership({
+      membership_id: studio.membership_id,
+      studio_name: studio.studio_name,
+      role: studio.role,
+      permissions: studio.permissions || {},
+    })
+    setEditedPermissions(studio.permissions || {})
+  }
+
+  async function handleSavePermissions() {
+    if (!editingMembership) return
+
+    setIsSaving(true)
+    try {
+      const response = await fetch(`/api/studio/members/${editingMembership.membership_id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissions: editedPermissions }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success('Permisos actualizados')
+      setEditingMembership(null)
+      setSelectedUser(null)
+      fetchUsers() // Recargar lista
+    } catch (error) {
+      console.error('Error updating permissions:', error)
+      toast.error('Error al actualizar permisos')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function handleDeleteMembership(membershipId: string, studioName: string) {
+    if (!confirm(`¿Eliminar membresía de "${studioName}"?`)) return
+
+    try {
+      const response = await fetch(`/api/studio/members/${membershipId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success('Membresía eliminada')
+      setSelectedUser(null)
+      fetchUsers() // Recargar lista
+    } catch (error) {
+      console.error('Error deleting membership:', error)
+      toast.error('Error al eliminar membresía')
     }
   }
 
@@ -331,9 +431,33 @@ export function UsersTab() {
                           <Building2 className="h-4 w-4 text-muted-foreground" />
                           <span>{studio.studio_name}</span>
                         </div>
-                        <Badge variant={getRoleBadgeVariant(studio.role)}>
-                          {studio.role}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={getRoleBadgeVariant(studio.role)}>
+                            {studio.role}
+                          </Badge>
+                          {studio.role !== 'owner' && (
+                            <>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => openEditPermissions(studio)}
+                                title="Editar permisos"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                                onClick={() => handleDeleteMembership(studio.membership_id, studio.studio_name)}
+                                title="Eliminar membresía"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -341,6 +465,55 @@ export function UsersTab() {
               )}
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de edición de permisos */}
+      <Dialog open={!!editingMembership} onOpenChange={() => setEditingMembership(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="h-5 w-5" />
+              Editar Permisos
+            </DialogTitle>
+            <DialogDescription>
+              {editingMembership?.studio_name} - {editingMembership?.role}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2">
+            {editingMembership?.role === 'admin' ? (
+              <p className="text-sm text-muted-foreground">
+                Los administradores tienen todos los permisos automáticamente.
+              </p>
+            ) : (
+              PERMISSION_CONFIGS.map((config) => (
+                <div key={config.key} className="flex items-center justify-between">
+                  <Label htmlFor={config.key} className="cursor-pointer">
+                    {config.label}
+                  </Label>
+                  <Switch
+                    id={config.key}
+                    checked={editedPermissions[config.key] || false}
+                    onCheckedChange={(checked) =>
+                      setEditedPermissions((prev) => ({ ...prev, [config.key]: checked }))
+                    }
+                  />
+                </div>
+              ))
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingMembership(null)} disabled={isSaving}>
+              Cancelar
+            </Button>
+            {editingMembership?.role !== 'admin' && (
+              <Button onClick={handleSavePermissions} disabled={isSaving}>
+                {isSaving ? 'Guardando...' : 'Guardar'}
+              </Button>
+            )}
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

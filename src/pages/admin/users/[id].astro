@@ -1,0 +1,14 @@
+---
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { UserDetailManager } from '@/components/admin/UserDetailManager'
+
+const { id } = Astro.params
+
+if (!id) {
+  return Astro.redirect('/admin/settings')
+}
+---
+
+<AdminLayout title="Detalle de Usuario">
+  <UserDetailManager userId={id} client:load />
+</AdminLayout>

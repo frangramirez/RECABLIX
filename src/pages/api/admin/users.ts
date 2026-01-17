@@ -10,9 +10,11 @@ export interface UserWithRoles {
   created_at: string
   is_superadmin: boolean
   studios: {
+    membership_id: string
     studio_id: string
     studio_name: string
     role: string
+    permissions: Record<string, boolean>
   }[]
 }
 
@@ -50,12 +52,14 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
     const users = authData.users
 
-    // Obtener membresías de studios
+    // Obtener membresías de studios (incluyendo id y permissions)
     const { data: memberships, error: membershipsError } = await supabaseAdmin
       .from('studio_members')
       .select(`
+        id,
         user_id,
         role,
+        permissions,
         studio_id,
         studios:studio_id (
           id,
@@ -81,9 +85,11 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
     // Agrupar membresías por usuario
     const membershipsByUser = new Map<string, Array<{
+      membership_id: string
       studio_id: string
       studio_name: string
       role: string
+      permissions: Record<string, boolean>
     }>>()
 
     for (const m of memberships || []) {
@@ -94,9 +100,11 @@ export const GET: APIRoute = async ({ request, cookies }) => {
 
       const userMemberships = membershipsByUser.get(m.user_id) || []
       userMemberships.push({
+        membership_id: m.id,
         studio_id: studioData.id,
         studio_name: studioData.name,
         role: m.role,
+        permissions: (m.permissions as Record<string, boolean>) || {},
       })
       membershipsByUser.set(m.user_id, userMemberships)
     }
