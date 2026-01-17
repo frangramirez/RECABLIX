@@ -60,20 +60,50 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
   // Asegurar que el tenant schema existe (fallback si el trigger falló)
   const schemaName = await ensureTenantSchema(supabaseAdmin, studioId)
 
+  // Esperar un momento para que PostgREST recargue la configuración del schema
+  await new Promise(resolve => setTimeout(resolve, 300))
+
   // Obtener cliente con datos de reca usando tenant schema si está habilitado
-  const clientsQuery = getQueryBuilder(schemaName, 'clients')
-  const { data: clientWithData, error: clientError } = await clientsQuery
-    .select(`
-      id, name, cuit, studio_id,
-      reca_client_data (
-        activity, province_code, works_in_rd, is_retired,
-        dependents, local_m2, annual_rent, annual_mw,
-        previous_category, previous_fee,
-        is_exempt, has_multilateral
-      )
-    `)
-    .eq('id', clientId)
-    .single()
+  // Implementar retry porque PostgREST puede tardar en recargar el schema
+  let clientWithData: {
+    id: string
+    name: string
+    cuit: string
+    studio_id: string
+    reca_client_data: unknown
+  } | null = null
+  let clientError: { message: string } | null = null
+
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const clientsQuery = getQueryBuilder(schemaName, 'clients')
+    const result = await clientsQuery
+      .select(`
+        id, name, cuit, studio_id,
+        reca_client_data (
+          activity, province_code, works_in_rd, is_retired,
+          dependents, local_m2, annual_rent, annual_mw,
+          previous_category, previous_fee,
+          is_exempt, has_multilateral
+        )
+      `)
+      .eq('id', clientId)
+      .single()
+
+    // Si no hay error de permisos, salir del retry
+    if (!result.error || !result.error.message.includes('permission denied')) {
+      clientWithData = result.data
+      clientError = result.error
+      break
+    }
+
+    // Si es error de permisos y no es el último intento, esperar y reintentar
+    if (attempt < 3) {
+      console.log(`[PDF] Schema permission retry ${attempt}/3, waiting...`)
+      await new Promise(r => setTimeout(r, 300 * attempt))
+    } else {
+      clientError = result.error
+    }
+  }
 
   if (clientError || !clientWithData) {
     console.error('[PDF] Client query failed:', { clientError, clientId, schemaName })

@@ -62,6 +62,8 @@ export interface InviteUserResponse {
   studio_member_created?: boolean;
   message?: string;
   error?: string;
+  /** Link de invitación de backup (por si el email no llega) */
+  invitation_link?: string;
 }
 
 /**

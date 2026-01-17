@@ -171,15 +171,35 @@ export function TransactionsManager({ clientId, activePeriod, studioId, schemaNa
     const rows = XLSX.utils.sheet_to_json(ws) as any[]
 
     let success = 0
+    let skipped = 0
     for (const row of rows) {
-      if (!row.Periodo || !row.Tipo || row.Monto === undefined) continue
+      // Validar campos obligatorios
+      if (!row.Tipo || row.Monto === undefined) {
+        skipped++
+        continue
+      }
+
+      // Determinar período: usar Periodo del Excel, o derivar de Fecha si no existe
+      let period: string | null = row.Periodo ? String(row.Periodo) : null
+      const txDate = row.Fecha ? String(row.Fecha) : null
+
+      if (!period && txDate) {
+        // Derivar período de la fecha
+        period = derivePeriod(txDate)
+      }
+
+      if (!period) {
+        // Sin período ni fecha, no se puede importar
+        skipped++
+        continue
+      }
 
       const txData = {
         client_id: clientId,
         transaction_type: row.Tipo.toUpperCase() === 'VENTA' ? 'SALE' : 'PURCHASE',
-        period: String(row.Periodo),
+        period,
         amount: parseFloat(row.Monto),
-        transaction_date: row.Fecha || null,
+        transaction_date: txDate,
         description: row.Descripcion || null,
       }
 
@@ -187,7 +207,10 @@ export function TransactionsManager({ clientId, activePeriod, studioId, schemaNa
       if (!error) success++
     }
 
-    toast({ title: 'Importado', description: `${success} transacciones importadas` })
+    const desc = skipped > 0
+      ? `${success} importadas, ${skipped} omitidas (sin tipo/monto/fecha)`
+      : `${success} transacciones importadas`
+    toast({ title: 'Importado', description: desc })
     fetchTransactions()
     e.target.value = ''
   }

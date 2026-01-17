@@ -79,6 +79,7 @@ export function UsersTab() {
   const [editingMembership, setEditingMembership] = useState<EditingMembership | null>(null)
   const [editedPermissions, setEditedPermissions] = useState<MembershipPermissions>({})
   const [isSaving, setIsSaving] = useState(false)
+  const [changingRoleFor, setChangingRoleFor] = useState<string | null>(null)
 
   useEffect(() => {
     fetchUsers()
@@ -224,6 +225,31 @@ export function UsersTab() {
     } catch (error) {
       console.error('Error deleting membership:', error)
       toast.error('Error al eliminar membresía')
+    }
+  }
+
+  async function handleRoleChange(membershipId: string, newRole: string) {
+    setChangingRoleFor(membershipId)
+    try {
+      const response = await fetch(`/api/studio/members/${membershipId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole }),
+      })
+
+      const data = await response.json()
+      if (data.error) {
+        toast.error(data.error)
+        return
+      }
+
+      toast.success('Rol actualizado')
+      fetchUsers() // Recargar lista
+    } catch (error) {
+      console.error('Error changing role:', error)
+      toast.error('Error al cambiar rol')
+    } finally {
+      setChangingRoleFor(null)
     }
   }
 
@@ -400,33 +426,57 @@ export function UsersTab() {
                                     >
                                       <div className="flex items-center gap-3">
                                         <span className="font-medium">{studio.studio_name}</span>
-                                        <Badge variant={getRoleBadgeVariant(studio.role)}>
-                                          {studio.role}
-                                        </Badge>
+                                        {studio.role === 'owner' ? (
+                                          <Badge variant={getRoleBadgeVariant(studio.role)}>
+                                            {studio.role}
+                                          </Badge>
+                                        ) : (
+                                          <Select
+                                            value={studio.role}
+                                            onValueChange={(newRole) => handleRoleChange(studio.membership_id, newRole)}
+                                            disabled={changingRoleFor === studio.membership_id}
+                                          >
+                                            <SelectTrigger
+                                              className="h-7 w-[120px]"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              <SelectItem value="admin">admin</SelectItem>
+                                              <SelectItem value="collaborator">collaborator</SelectItem>
+                                              <SelectItem value="client">client</SelectItem>
+                                            </SelectContent>
+                                          </Select>
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-2">
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            openEditPermissions(studio)
-                                          }}
-                                        >
-                                          <Settings className="h-4 w-4 mr-1" />
-                                          Permisos
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                                          onClick={(e) => {
-                                            e.stopPropagation()
-                                            handleDeleteMembership(studio.membership_id, studio.studio_name)
-                                          }}
-                                        >
-                                          <Trash2 className="h-4 w-4" />
-                                        </Button>
+                                        {studio.role !== 'owner' && (
+                                          <>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                openEditPermissions(studio)
+                                              }}
+                                            >
+                                              <Settings className="h-4 w-4 mr-1" />
+                                              Permisos
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                              onClick={(e) => {
+                                                e.stopPropagation()
+                                                handleDeleteMembership(studio.membership_id, studio.studio_name)
+                                              }}
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          </>
+                                        )}
                                       </div>
                                     </div>
                                   ))}

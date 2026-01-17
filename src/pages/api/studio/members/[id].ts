@@ -1,7 +1,7 @@
 /**
  * API Route: Gestión de Miembro Individual
  *
- * PATCH /api/studio/members/[id] - Actualizar permisos
+ * PATCH /api/studio/members/[id] - Actualizar rol y/o permisos
  * DELETE /api/studio/members/[id] - Eliminar miembro
  */
 
@@ -12,7 +12,7 @@ import { createSupabaseServerClient } from '@/lib/supabase'
 
 /**
  * PATCH /api/studio/members/[id]
- * Actualiza permisos de un miembro
+ * Actualiza rol y/o permisos de un miembro
  */
 export const PATCH: APIRoute = async ({ params, cookies, request }) => {
   try {
@@ -68,10 +68,29 @@ export const PATCH: APIRoute = async ({ params, cookies, request }) => {
       }
     }
 
-    // Actualizar permisos
+    // Construir objeto de actualización (solo campos presentes)
+    const updateData: { role?: string; permissions?: Record<string, boolean> } = {}
+
+    if (updates.role !== undefined) {
+      // Validar rol válido
+      const validRoles = ['admin', 'collaborator', 'client']
+      if (!validRoles.includes(updates.role)) {
+        return new Response(
+          JSON.stringify({ error: 'Rol inválido' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      updateData.role = updates.role
+    }
+
+    if (updates.permissions !== undefined) {
+      updateData.permissions = updates.permissions
+    }
+
+    // Actualizar miembro
     const { data, error } = await supabase
       .from('studio_members')
-      .update({ permissions: updates.permissions })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single()

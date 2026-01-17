@@ -376,14 +376,10 @@ export function StudiosManager() {
 
     setSavingMember(true)
     try {
-      const response = await fetch('/api/studio/members', {
-        method: 'PUT',
+      const response = await fetch(`/api/studio/members/${member.id}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studio_id: editingStudio?.id,
-          membership_id: member.id,
-          role: newRole,
-        }),
+        body: JSON.stringify({ role: newRole }),
       })
 
       const data = await response.json()
@@ -408,13 +404,9 @@ export function StudiosManager() {
     if (!confirm(`¿Eliminar a ${member.email} del estudio?`)) return
 
     try {
-      const response = await fetch('/api/studio/members', {
+      const response = await fetch(`/api/studio/members/${member.id}`, {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          studio_id: editingStudio?.id,
-          membership_id: member.id,
-        }),
       })
 
       const data = await response.json()
@@ -863,7 +855,10 @@ export function StudiosManager() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="limit-clients">Máximo de Clientes (portal externo)</Label>
+                          <Label htmlFor="limit-clients">Máximo de Clientes</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Aplica al total de clientes del estudio
+                          </p>
                           <Input
                             id="limit-clients"
                             type="number"

@@ -365,8 +365,27 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     // Construir mensaje apropiado
     let message = 'Miembro agregado correctamente'
+    let invitationLink: string | null = null
+
     if (userCreated && invitationSent) {
       message = 'Usuario creado e invitación enviada por email. Se agregó como miembro.'
+
+      // Generar link de invitación como backup (por si el email no llega)
+      try {
+        const origin = new URL(request.url).origin
+        const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+          type: 'magiclink',
+          email: targetUser.email!,
+          options: {
+            redirectTo: `${origin}/auth/confirm`,
+          }
+        })
+        if (linkData?.properties?.action_link) {
+          invitationLink = linkData.properties.action_link
+        }
+      } catch (linkError) {
+        console.warn('Could not generate backup invitation link:', linkError)
+      }
     }
 
     return new Response(
@@ -378,6 +397,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         },
         user_created: userCreated,
         invitation_sent: invitationSent,
+        invitation_link: invitationLink,
         message,
       }),
       {

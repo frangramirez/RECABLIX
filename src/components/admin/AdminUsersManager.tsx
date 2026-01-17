@@ -177,7 +177,16 @@ export function AdminUsersManager() {
         throw new Error(data.error || 'Error al invitar usuario')
       }
 
-      toast.success(data.message)
+      // Mostrar link de invitación si está disponible
+      if (data.invitation_link) {
+        toast.success(data.message, {
+          description: 'Link de backup copiado al portapapeles',
+          duration: 8000,
+        })
+        navigator.clipboard.writeText(data.invitation_link)
+      } else {
+        toast.success(data.message)
+      }
 
       // Refrescar lista de usuarios
       await fetchUsers()

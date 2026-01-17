@@ -131,6 +131,18 @@ export function RecategorizationView({
         }
       })
 
+      // DEBUG: Log ventas por cliente para diagnóstico
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[RECA DEBUG] Transacciones cargadas:', allTx?.length)
+        console.log('[RECA DEBUG] Clientes con ventas:', salesByClient.size)
+        salesByClient.forEach((sales, clientId) => {
+          const client = clientsWithData.find(c => c.id === clientId)
+          if (sales > 50_000_000) {
+            console.log(`[RECA DEBUG] ${client?.name || clientId}: $${sales.toLocaleString()}`)
+          }
+        })
+      }
+
       // 4. Obtener escalas y componentes UNA vez (o usar cache)
       let scales = cachedScales
       let feeComponents = cachedFeeComponents
@@ -169,7 +181,28 @@ export function RecategorizationView({
         }
 
         try {
+          // DEBUG: Log para clientes con ventas altas pero categoría baja esperada
+          if (process.env.NODE_ENV === 'development' && clientData.periodSales > 50_000_000) {
+            console.log('[RECA DEBUG] Cliente con ventas altas:', {
+              name: clientData.name,
+              id: clientData.id,
+              periodSales: clientData.periodSales,
+              activity: clientData.activity,
+            })
+          }
+
           const result = calculateRecategorizationFromData(scales!, feeComponents!, clientData)
+
+          // DEBUG: Log si categoría es A pero tiene ventas altas
+          if (process.env.NODE_ENV === 'development' && result.category.finalCategory === 'A' && clientData.periodSales > 10_000_000) {
+            console.warn('[RECA DEBUG] ⚠️ Categoría A con ventas altas:', {
+              name: clientData.name,
+              periodSales: clientData.periodSales,
+              categoryByIncome: result.category.categoryByIncome,
+              incomeLimit: result.category.details.income.limit,
+            })
+          }
+
           calculatedResults.push(result)
         } catch (err) {
           console.error(`Error calculando ${client.name}:`, err)
