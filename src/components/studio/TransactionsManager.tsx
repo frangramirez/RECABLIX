@@ -27,9 +27,12 @@ interface Props {
   clientId: string
   clientName: string
   activePeriod: { sales_period_start: string; sales_period_end: string } | null
+  // Optional props for explicit tenant context (used in /admin/my-studios)
+  studioId?: string
+  schemaName?: string
 }
 
-export function TransactionsManager({ clientId, activePeriod }: Props) {
+export function TransactionsManager({ clientId, activePeriod, studioId, schemaName }: Props) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [periodFilter, setPeriodFilter] = useState<string>('all')
@@ -37,11 +40,13 @@ export function TransactionsManager({ clientId, activePeriod }: Props) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const { toast } = useToast()
 
-  // Tenant queries
+  // Tenant queries - use props if available, otherwise fall back to session
   const session = useSession()
-  const tenantContext = session.studio
-    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
-    : null
+  const tenantContext = schemaName && studioId
+    ? { studioId, schemaName }
+    : session.studio
+      ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+      : null
   const { query, isReady } = useTenantSupabase(tenantContext)
 
   useEffect(() => {

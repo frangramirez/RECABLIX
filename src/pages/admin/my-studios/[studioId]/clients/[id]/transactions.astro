@@ -1,0 +1,78 @@
+---
+/**
+ * Página de transacciones de cliente para /admin/my-studios/[studioId]/clients/[id]/transactions
+ * Usa tenant schema para queries
+ */
+import AdminLayout from '@/layouts/AdminLayout.astro'
+import { TransactionsManager } from '@/components/studio/TransactionsManager'
+import { supabaseAdmin } from '@/lib/supabase'
+import { getTenantSchemaName } from '@/lib/config'
+
+const { studioId, id } = Astro.params
+
+if (!studioId || !id) {
+  return Astro.redirect('/admin/my-studios')
+}
+if (!supabaseAdmin) {
+  return Astro.redirect('/admin')
+}
+
+// Obtener el schema name del studio
+const { data: studio } = await supabaseAdmin
+  .from('studios')
+  .select('id, name, schema_name')
+  .eq('id', studioId)
+  .single()
+
+if (!studio) {
+  return Astro.redirect('/admin/my-studios')
+}
+
+const schemaName = studio.schema_name || getTenantSchemaName(studioId)
+
+// Query al tenant schema para verificar que el cliente existe
+const { data: client, error } = await supabaseAdmin
+  .schema(schemaName)
+  .from('clients')
+  .select('id, name')
+  .eq('id', id)
+  .single()
+
+if (error) {
+  console.error('[my-studios/clients/[id]/transactions] Error loading client:', error)
+}
+
+if (!client) {
+  return Astro.redirect(`/admin/my-studios/${studioId}/clients`)
+}
+
+// Obtener período activo (desde public schema)
+const { data: activePeriod } = await supabaseAdmin
+  .from('reca_periods')
+  .select('*')
+  .eq('is_active', true)
+  .single()
+
+const returnUrl = `/admin/my-studios/${studioId}/clients`
+---
+
+<AdminLayout title={`Transacciones - ${client.name}`}>
+  <div class="space-y-6">
+    <div class="flex items-center gap-4">
+      <a href={returnUrl} class="text-muted-foreground hover:text-foreground">
+        &larr; Volver a clientes
+      </a>
+      <span class="text-muted-foreground">|</span>
+      <span class="text-sm text-muted-foreground">{studio.name}</span>
+    </div>
+    <h1 class="text-2xl font-bold">Transacciones: {client.name}</h1>
+    <TransactionsManager
+      client:load
+      clientId={client.id}
+      clientName={client.name}
+      activePeriod={activePeriod}
+      studioId={studioId}
+      schemaName={schemaName}
+    />
+  </div>
+</AdminLayout>
