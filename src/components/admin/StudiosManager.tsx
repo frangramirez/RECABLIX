@@ -21,7 +21,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Users, FileText, Building2, Download, Upload, UserCog } from 'lucide-react'
+import { Plus, Users, FileText, Building2, Download, Upload, UserCog, Pencil, Settings } from 'lucide-react'
 import { toast } from 'sonner'
 import { UsersTab } from './UsersTab'
 import * as XLSX from 'xlsx'
@@ -39,6 +39,16 @@ interface Studio {
 interface StudioFormData {
   name: string
   slug: string
+}
+
+interface SubscriptionLimits {
+  max_admins: number | null
+  max_collaborators: number | null
+  max_clients: number | null
+}
+
+interface EditingStudio extends Studio {
+  subscription_limits: SubscriptionLimits
 }
 
 function generateSlug(name: string): string {
@@ -61,6 +71,12 @@ export function StudiosManager() {
     slug: '',
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Estado para edición
+  const [editingStudio, setEditingStudio] = useState<EditingStudio | null>(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
+  const [editActiveTab, setEditActiveTab] = useState('general')
 
   useEffect(() => {
     fetchStudios()
@@ -210,6 +226,67 @@ export function StudiosManager() {
     const timestamp = new Date().toISOString().split('T')[0]
     XLSX.writeFile(wb, `estudios_${timestamp}.xlsx`)
     toast.success('Estudios exportados correctamente')
+  }
+
+  async function openEditDialog(studio: Studio) {
+    try {
+      // Obtener datos completos del estudio incluyendo subscription_limits
+      const { data, error } = await supabase
+        .from('studios')
+        .select('subscription_limits')
+        .eq('id', studio.id)
+        .single()
+
+      if (error) throw error
+
+      const limits = (data?.subscription_limits as SubscriptionLimits) || {
+        max_admins: null,
+        max_collaborators: null,
+        max_clients: null,
+      }
+
+      setEditingStudio({
+        ...studio,
+        subscription_limits: limits,
+      })
+      setEditActiveTab('general')
+      setIsEditDialogOpen(true)
+    } catch (error: any) {
+      console.error('Error loading studio:', error)
+      toast.error('Error al cargar datos del estudio')
+    }
+  }
+
+  async function handleSaveEdit() {
+    if (!editingStudio) return
+
+    setIsSavingEdit(true)
+    try {
+      const { error } = await supabase
+        .from('studios')
+        .update({
+          name: editingStudio.name,
+          slug: editingStudio.slug,
+          subscription_limits: editingStudio.subscription_limits,
+        })
+        .eq('id', editingStudio.id)
+
+      if (error) throw error
+
+      toast.success('Estudio actualizado correctamente')
+      setIsEditDialogOpen(false)
+      setEditingStudio(null)
+      fetchStudios()
+    } catch (error: any) {
+      console.error('Error updating studio:', error)
+      if (error.code === '23505') {
+        toast.error('El slug ya está en uso por otro estudio')
+      } else {
+        toast.error(error.message || 'Error al actualizar estudio')
+      }
+    } finally {
+      setIsSavingEdit(false)
+    }
   }
 
   async function handleImpersonate(studioId: string, studioName: string) {
@@ -432,15 +509,25 @@ export function StudiosManager() {
                           {new Date(studio.created_at).toLocaleDateString('es-AR')}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleImpersonate(studio.id, studio.name)}
-                            title="Acceder como owner de este estudio"
-                          >
-                            <UserCog className="h-4 w-4 mr-2" />
-                            Impersonar
-                          </Button>
+                          <div className="flex items-center justify-end gap-2">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => openEditDialog(studio)}
+                              title="Editar estudio"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleImpersonate(studio.id, studio.name)}
+                              title="Acceder como owner de este estudio"
+                            >
+                              <UserCog className="h-4 w-4 mr-2" />
+                              Impersonar
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))
@@ -500,6 +587,168 @@ export function StudiosManager() {
                     <Button type="submit">Crear Estudio</Button>
                   </DialogFooter>
                 </form>
+              </DialogContent>
+            </Dialog>
+
+            {/* Dialog para editar */}
+            <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
+              setIsEditDialogOpen(open)
+              if (!open) setEditingStudio(null)
+            }}>
+              <DialogContent className="max-w-lg">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <Settings className="h-5 w-5" />
+                    Editar Estudio
+                  </DialogTitle>
+                  <DialogDescription>
+                    Modifica los datos y límites del estudio.
+                  </DialogDescription>
+                </DialogHeader>
+
+                {editingStudio && (
+                  <Tabs value={editActiveTab} onValueChange={setEditActiveTab}>
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="general">General</TabsTrigger>
+                      <TabsTrigger value="limits">Límites</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="general" className="space-y-4 mt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-name">Nombre del Estudio</Label>
+                        <Input
+                          id="edit-name"
+                          value={editingStudio.name}
+                          onChange={(e) =>
+                            setEditingStudio({
+                              ...editingStudio,
+                              name: e.target.value,
+                              slug: generateSlug(e.target.value),
+                            })
+                          }
+                          placeholder="Nombre del estudio"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="edit-slug">Slug</Label>
+                        <Input
+                          id="edit-slug"
+                          value={editingStudio.slug}
+                          onChange={(e) =>
+                            setEditingStudio({
+                              ...editingStudio,
+                              slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''),
+                            })
+                          }
+                          placeholder="nombre-del-estudio"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Solo minúsculas, números y guiones. Se usa para URLs.
+                        </p>
+                      </div>
+
+                      <div className="pt-2 space-y-2 text-sm text-muted-foreground">
+                        <div className="flex justify-between">
+                          <span>Miembros:</span>
+                          <span className="font-medium">{editingStudio.member_count}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Clientes RECABLIX:</span>
+                          <span className="font-medium">{editingStudio.client_count}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Creado:</span>
+                          <span>{new Date(editingStudio.created_at).toLocaleDateString('es-AR')}</span>
+                        </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="limits" className="space-y-4 mt-4">
+                      <p className="text-sm text-muted-foreground">
+                        Define límites de usuarios por rol. Dejar en blanco para ilimitado.
+                      </p>
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="limit-admins">Máximo de Admins</Label>
+                          <Input
+                            id="limit-admins"
+                            type="number"
+                            min="0"
+                            value={editingStudio.subscription_limits.max_admins ?? ''}
+                            onChange={(e) =>
+                              setEditingStudio({
+                                ...editingStudio,
+                                subscription_limits: {
+                                  ...editingStudio.subscription_limits,
+                                  max_admins: e.target.value ? parseInt(e.target.value) : null,
+                                },
+                              })
+                            }
+                            placeholder="Ilimitado"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="limit-collaborators">Máximo de Colaboradores</Label>
+                          <Input
+                            id="limit-collaborators"
+                            type="number"
+                            min="0"
+                            value={editingStudio.subscription_limits.max_collaborators ?? ''}
+                            onChange={(e) =>
+                              setEditingStudio({
+                                ...editingStudio,
+                                subscription_limits: {
+                                  ...editingStudio.subscription_limits,
+                                  max_collaborators: e.target.value ? parseInt(e.target.value) : null,
+                                },
+                              })
+                            }
+                            placeholder="Ilimitado"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="limit-clients">Máximo de Clientes (portal externo)</Label>
+                          <Input
+                            id="limit-clients"
+                            type="number"
+                            min="0"
+                            value={editingStudio.subscription_limits.max_clients ?? ''}
+                            onChange={(e) =>
+                              setEditingStudio({
+                                ...editingStudio,
+                                subscription_limits: {
+                                  ...editingStudio.subscription_limits,
+                                  max_clients: e.target.value ? parseInt(e.target.value) : null,
+                                },
+                              })
+                            }
+                            placeholder="Ilimitado"
+                          />
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                )}
+
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditDialogOpen(false)
+                      setEditingStudio(null)
+                    }}
+                    disabled={isSavingEdit}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={handleSaveEdit} disabled={isSavingEdit}>
+                    {isSavingEdit ? 'Guardando...' : 'Guardar Cambios'}
+                  </Button>
+                </DialogFooter>
               </DialogContent>
             </Dialog>
           </div>

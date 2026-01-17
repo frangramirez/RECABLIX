@@ -144,6 +144,7 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
   const result = await calculateRecategorization(supabaseAdmin, period.id, clientData)
 
   // Consultar si la provincia tiene IIBB integrado
+  // Usar maybeSingle() para evitar error 500 si no existe registro para esta provincia
   const { data: ibpComponent } = await supabaseAdmin
     .from('reca_fee_components')
     .select('has_integrated_iibb')
@@ -151,9 +152,9 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
     .eq('component_type', 'IBP')
     .eq('province_code', (reca.province_code as string) || '901')
     .limit(1)
-    .single()
+    .maybeSingle()
 
-  const hasIntegratedIIBB = ibpComponent?.has_integrated_iibb || false
+  const hasIntegratedIIBB = ibpComponent?.has_integrated_iibb ?? false
 
   // Generar PDF con manejo de errores
   try {

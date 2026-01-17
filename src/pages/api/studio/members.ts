@@ -59,18 +59,10 @@ export const GET: APIRoute = async ({ url, cookies, request }) => {
     }
 
     // Usar supabaseAdmin para bypasear RLS (especialmente para superadmins viendo otros studios)
+    // No podemos hacer join con auth.users desde PostgREST (diferente schema)
     const { data: members, error } = await supabaseAdmin
       .from('studio_members')
-      .select(
-        `
-        id,
-        user_id,
-        role,
-        permissions,
-        created_at,
-        users (email)
-      `
-      )
+      .select('id, user_id, role, permissions, created_at')
       .eq('studio_id', studioId)
       .order('created_at', { ascending: true })
 
@@ -82,7 +74,29 @@ export const GET: APIRoute = async ({ url, cookies, request }) => {
       })
     }
 
-    return new Response(JSON.stringify({ members }), {
+    // Obtener emails de auth.users usando Admin API
+    const userIds = members?.map(m => m.user_id) || []
+    let userEmails: Record<string, string> = {}
+
+    if (userIds.length > 0) {
+      const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
+      if (authUsers?.users) {
+        userEmails = authUsers.users.reduce((acc, user) => {
+          if (user.email && userIds.includes(user.id)) {
+            acc[user.id] = user.email
+          }
+          return acc
+        }, {} as Record<string, string>)
+      }
+    }
+
+    // Combinar miembros con emails
+    const membersWithEmails = (members || []).map(member => ({
+      ...member,
+      users: { email: userEmails[member.user_id] || 'Sin email' },
+    }))
+
+    return new Response(JSON.stringify({ members: membersWithEmails }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })

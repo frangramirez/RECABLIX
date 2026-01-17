@@ -160,8 +160,7 @@ export function ClientForm({ initialData, studioId, schemaName, returnUrl = '/st
         if (clientError) throw clientError
 
         const { error: recaError } = await query('reca_client_data')
-          .upsert({
-            client_id: initialData.id,
+          .update({
             activity: formData.activity,
             province_code: formData.province_code,
             works_in_rd: formData.works_in_rd,
@@ -178,6 +177,7 @@ export function ClientForm({ initialData, studioId, schemaName, returnUrl = '/st
             previous_category: formData.previous_category,
             previous_fee: formData.previous_fee,
           })
+          .eq('client_id', initialData.id)
 
         if (recaError) throw recaError
 

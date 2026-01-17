@@ -47,6 +47,8 @@ export function AdminUsersManager() {
   const [selectedStudio, setSelectedStudio] = useState<string>('')
   const [studios, setStudios] = useState<Studio[]>([])
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null)
+  const [studiosError, setStudiosError] = useState<string | null>(null)
+  const [studiosLoading, setStudiosLoading] = useState(false)
 
   // Dialog de invitación
   const [showInviteDialog, setShowInviteDialog] = useState(false)
@@ -95,6 +97,8 @@ export function AdminUsersManager() {
   }
 
   async function fetchStudios() {
+    setStudiosLoading(true)
+    setStudiosError(null)
     try {
       const response = await fetch('/api/admin/my-studios')
       if (!response.ok) throw new Error('Error al cargar studios')
@@ -111,8 +115,13 @@ export function AdminUsersManager() {
         }
         return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name))
       })
+      setStudiosError(null)
     } catch (error: unknown) {
       console.error('Error fetching studios:', error)
+      const message = error instanceof Error ? error.message : 'No se pudieron cargar los estudios'
+      setStudiosError(message)
+    } finally {
+      setStudiosLoading(false)
     }
   }
 
@@ -439,19 +448,37 @@ export function AdminUsersManager() {
 
             <div className="space-y-2">
               <Label htmlFor="invite-studio">Estudio (opcional)</Label>
-              <Select value={inviteStudioId} onValueChange={setInviteStudioId}>
-                <SelectTrigger id="invite-studio">
-                  <SelectValue placeholder="Sin estudio" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin estudio</SelectItem>
-                  {studios.map((studio) => (
-                    <SelectItem key={studio.id} value={studio.id}>
-                      {studio.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {studiosError ? (
+                <div className="text-sm text-destructive p-2 bg-destructive/10 rounded-md">
+                  {studiosError}
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 ml-2"
+                    onClick={() => fetchStudios()}
+                  >
+                    Reintentar
+                  </Button>
+                </div>
+              ) : studiosLoading ? (
+                <div className="text-sm text-muted-foreground p-2">
+                  Cargando estudios...
+                </div>
+              ) : (
+                <Select value={inviteStudioId} onValueChange={setInviteStudioId}>
+                  <SelectTrigger id="invite-studio">
+                    <SelectValue placeholder="Sin estudio" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin estudio</SelectItem>
+                    {studios.map((studio) => (
+                      <SelectItem key={studio.id} value={studio.id}>
+                        {studio.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {inviteStudioId && (

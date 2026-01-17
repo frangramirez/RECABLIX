@@ -24,11 +24,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Eye, Building2, ArrowRight, TrendingUp, TrendingDown, FileText, Mail } from 'lucide-react'
+import { Search, Eye, Building2, ArrowRight, TrendingUp, TrendingDown, FileText, Mail, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { toast } from 'sonner'
 import type { GlobalClient } from '@/pages/api/admin/clients'
 
 const CATEGORIES = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K']
+
+type SortDirection = 'asc' | 'desc' | null
+type SortKey = 'name' | 'cuit' | 'studio_name' | 'period_sales' | 'period_purchases' | 'previous_category' | 'new_category'
+
+interface SortConfig {
+  key: SortKey | null
+  direction: SortDirection
+}
 
 interface PeriodInfo {
   code: string
@@ -63,6 +71,29 @@ export function ClientsGlobalManager() {
 
   // Modal
   const [selectedClient, setSelectedClient] = useState<GlobalClient | null>(null)
+
+  // Ordenamiento
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: null })
+
+  function handleSort(key: SortKey) {
+    setSortConfig((prev) => {
+      if (prev.key !== key) {
+        // Nueva columna: iniciar con 'asc' para texto, 'desc' para números
+        const isNumeric = ['period_sales', 'period_purchases'].includes(key)
+        return { key, direction: isNumeric ? 'desc' : 'asc' }
+      }
+      // Misma columna: ciclar asc -> desc -> null
+      if (prev.direction === 'asc') return { key, direction: 'desc' }
+      if (prev.direction === 'desc') return { key: null, direction: null }
+      return { key, direction: 'asc' }
+    })
+  }
+
+  function getSortIcon(key: SortKey) {
+    if (sortConfig.key !== key) return <ArrowUpDown className="h-3.5 w-3.5 opacity-40" />
+    if (sortConfig.direction === 'asc') return <ArrowUp className="h-3.5 w-3.5" />
+    return <ArrowDown className="h-3.5 w-3.5" />
+  }
 
   useEffect(() => {
     fetchClients()
@@ -108,34 +139,73 @@ export function ClientsGlobalManager() {
     }
   }
 
-  // Filtrar clientes en el cliente
-  const filteredClients = clients.filter(client => {
-    // Filtro por búsqueda
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase()
-      if (!client.name.toLowerCase().includes(term) &&
-          !(client.cuit && client.cuit.includes(term))) {
+  // Filtrar y ordenar clientes
+  const filteredClients = (() => {
+    // Primero filtrar
+    let result = clients.filter(client => {
+      // Filtro por búsqueda
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase()
+        if (!client.name.toLowerCase().includes(term) &&
+            !(client.cuit && client.cuit.includes(term))) {
+          return false
+        }
+      }
+
+      // Filtro por estudio
+      if (studioFilter && studioFilter !== 'all' && client.studio_id !== studioFilter) {
         return false
       }
+
+      // Filtro por categoría nueva
+      if (categoryFilter && categoryFilter !== 'all' && client.new_category !== categoryFilter) {
+        return false
+      }
+
+      // Filtro por categoría anterior
+      if (prevCategoryFilter && prevCategoryFilter !== 'all' && client.previous_category !== prevCategoryFilter) {
+        return false
+      }
+
+      return true
+    })
+
+    // Luego ordenar
+    if (sortConfig.key && sortConfig.direction) {
+      const { key, direction } = sortConfig
+      const multiplier = direction === 'asc' ? 1 : -1
+
+      result = [...result].sort((a, b) => {
+        let aVal = a[key]
+        let bVal = b[key]
+
+        // Manejar nulls: siempre al final
+        if (aVal === null || aVal === undefined) return 1
+        if (bVal === null || bVal === undefined) return -1
+
+        // Para categorías, ordenar por índice en CATEGORIES
+        if (key === 'previous_category' || key === 'new_category') {
+          const aIndex = CATEGORIES.indexOf(aVal as string)
+          const bIndex = CATEGORIES.indexOf(bVal as string)
+          return (aIndex - bIndex) * multiplier
+        }
+
+        // Para números
+        if (typeof aVal === 'number' && typeof bVal === 'number') {
+          return (aVal - bVal) * multiplier
+        }
+
+        // Para strings
+        if (typeof aVal === 'string' && typeof bVal === 'string') {
+          return aVal.localeCompare(bVal, 'es') * multiplier
+        }
+
+        return 0
+      })
     }
 
-    // Filtro por estudio
-    if (studioFilter && studioFilter !== 'all' && client.studio_id !== studioFilter) {
-      return false
-    }
-
-    // Filtro por categoría nueva
-    if (categoryFilter && categoryFilter !== 'all' && client.new_category !== categoryFilter) {
-      return false
-    }
-
-    // Filtro por categoría anterior
-    if (prevCategoryFilter && prevCategoryFilter !== 'all' && client.previous_category !== prevCategoryFilter) {
-      return false
-    }
-
-    return true
-  })
+    return result
+  })()
 
   function formatCurrency(value: number | null): string {
     if (value === null || value === undefined) return '-'
@@ -262,13 +332,62 @@ export function ClientsGlobalManager() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
-              <TableHead>CUIT</TableHead>
-              <TableHead>Estudio</TableHead>
-              <TableHead className="text-right">Ventas</TableHead>
-              <TableHead className="text-right">Compras</TableHead>
-              <TableHead className="text-center">Cat. Ant.</TableHead>
-              <TableHead className="text-center">Nueva Cat.</TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort('name')}
+              >
+                <div className="flex items-center gap-1">
+                  Nombre {getSortIcon('name')}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort('cuit')}
+              >
+                <div className="flex items-center gap-1">
+                  CUIT {getSortIcon('cuit')}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none"
+                onClick={() => handleSort('studio_name')}
+              >
+                <div className="flex items-center gap-1">
+                  Estudio {getSortIcon('studio_name')}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none text-right"
+                onClick={() => handleSort('period_sales')}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Ventas {getSortIcon('period_sales')}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none text-right"
+                onClick={() => handleSort('period_purchases')}
+              >
+                <div className="flex items-center justify-end gap-1">
+                  Compras {getSortIcon('period_purchases')}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none text-center"
+                onClick={() => handleSort('previous_category')}
+              >
+                <div className="flex items-center justify-center gap-1">
+                  Cat. Ant. {getSortIcon('previous_category')}
+                </div>
+              </TableHead>
+              <TableHead
+                className="cursor-pointer hover:bg-muted/50 select-none text-center"
+                onClick={() => handleSort('new_category')}
+              >
+                <div className="flex items-center justify-center gap-1">
+                  Nueva Cat. {getSortIcon('new_category')}
+                </div>
+              </TableHead>
               <TableHead className="text-center">Acciones</TableHead>
             </TableRow>
           </TableHeader>

@@ -22,6 +22,7 @@ import { Save, Download, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import * as XLSX from 'xlsx'
+import { CurrencyInput } from '@/components/ui/CurrencyInput'
 
 interface Period {
   id: string
@@ -153,6 +154,14 @@ export function ScalesManager({ periods }: Props) {
     setScales((prev) =>
       prev.map((s) =>
         s.category === category ? { ...s, [field]: numValue } : s
+      )
+    )
+  }
+
+  function updateScaleNum(category: string, field: keyof RecaScale, value: number | null) {
+    setScales((prev) =>
+      prev.map((s) =>
+        s.category === category ? { ...s, [field]: value } : s
       )
     )
   }
@@ -504,19 +513,10 @@ export function ScalesManager({ periods }: Props) {
                   >
                     <TableCell className="font-bold">{scale.category}</TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={scale.max_annual_income || ''}
-                        onChange={(e) =>
-                          updateScale(
-                            scale.category,
-                            'max_annual_income',
-                            e.target.value
-                          )
-                        }
-                        className="w-full"
-                        placeholder="0.00"
+                      <CurrencyInput
+                        value={scale.max_annual_income}
+                        onChange={(val) => updateScaleNum(scale.category, 'max_annual_income', val)}
+                        className="w-full text-right tabular-nums"
                       />
                     </TableCell>
                     <TableCell>
@@ -535,19 +535,10 @@ export function ScalesManager({ periods }: Props) {
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={scale.max_annual_rent || ''}
-                        onChange={(e) =>
-                          updateScale(
-                            scale.category,
-                            'max_annual_rent',
-                            e.target.value
-                          )
-                        }
-                        className="w-full"
-                        placeholder="0.00"
+                      <CurrencyInput
+                        value={scale.max_annual_rent}
+                        onChange={(val) => updateScaleNum(scale.category, 'max_annual_rent', val)}
+                        className="w-full text-right tabular-nums"
                       />
                     </TableCell>
                     <TableCell>
@@ -566,83 +557,38 @@ export function ScalesManager({ periods }: Props) {
                       />
                     </TableCell>
                     <TableCell>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={scale.max_unit_sale || ''}
-                        onChange={(e) =>
-                          updateScale(
-                            scale.category,
-                            'max_unit_sale',
-                            e.target.value
-                          )
-                        }
-                        className="w-full"
-                        placeholder="0.00"
+                      <CurrencyInput
+                        value={scale.max_unit_sale}
+                        onChange={(val) => updateScaleNum(scale.category, 'max_unit_sale', val)}
+                        className="w-full text-right tabular-nums"
                       />
                     </TableCell>
                     <TableCell className="bg-blue-50/20">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={scale.fee_s20 || ''}
-                        onChange={(e) =>
-                          updateScale(
-                            scale.category,
-                            'fee_s20',
-                            e.target.value
-                          )
-                        }
-                        className="w-full"
-                        placeholder="0.00"
+                      <CurrencyInput
+                        value={scale.fee_s20}
+                        onChange={(val) => updateScaleNum(scale.category, 'fee_s20', val)}
+                        className="w-full text-right tabular-nums"
                       />
                     </TableCell>
                     <TableCell className="bg-blue-50/20">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={scale.fee_b20 || ''}
-                        onChange={(e) =>
-                          updateScale(
-                            scale.category,
-                            'fee_b20',
-                            e.target.value
-                          )
-                        }
-                        className="w-full"
-                        placeholder="0.00"
+                      <CurrencyInput
+                        value={scale.fee_b20}
+                        onChange={(val) => updateScaleNum(scale.category, 'fee_b20', val)}
+                        className="w-full text-right tabular-nums"
                       />
                     </TableCell>
                     <TableCell className="bg-green-50/20">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={scale.fee_021 || ''}
-                        onChange={(e) =>
-                          updateScale(
-                            scale.category,
-                            'fee_021',
-                            e.target.value
-                          )
-                        }
-                        className="w-full"
-                        placeholder="0.00"
+                      <CurrencyInput
+                        value={scale.fee_021}
+                        onChange={(val) => updateScaleNum(scale.category, 'fee_021', val)}
+                        className="w-full text-right tabular-nums"
                       />
                     </TableCell>
                     <TableCell className="bg-amber-50/20">
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={scale.fee_024 || ''}
-                        onChange={(e) =>
-                          updateScale(
-                            scale.category,
-                            'fee_024',
-                            e.target.value
-                          )
-                        }
-                        className="w-full"
-                        placeholder="0.00"
+                      <CurrencyInput
+                        value={scale.fee_024}
+                        onChange={(val) => updateScaleNum(scale.category, 'fee_024', val)}
+                        className="w-full text-right tabular-nums"
                       />
                     </TableCell>
                   </TableRow>
