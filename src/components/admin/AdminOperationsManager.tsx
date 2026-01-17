@@ -114,8 +114,8 @@ export function AdminOperationsManager({ ownStudioId, activePeriod: serverActive
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingTransaction
-          ? { action: 'update', id: editingTransaction.id, data: txData }
-          : { action: 'create', data: txData }
+          ? { action: 'update', id: editingTransaction.id, data: txData, studioId: activeStudioId }
+          : { action: 'create', data: txData, studioId: activeStudioId }
         ),
       })
 
@@ -141,7 +141,7 @@ export function AdminOperationsManager({ ownStudioId, activePeriod: serverActive
       const res = await fetch('/api/admin/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete', id }),
+        body: JSON.stringify({ action: 'delete', id, studioId: activeStudioId }),
       })
 
       const result = await res.json()
@@ -211,7 +211,7 @@ export function AdminOperationsManager({ ownStudioId, activePeriod: serverActive
         const res = await fetch('/api/admin/transactions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'bulk_create', transactions: transactionsToInsert }),
+          body: JSON.stringify({ action: 'bulk_create', transactions: transactionsToInsert, studioId: activeStudioId }),
         })
 
         const result = await res.json()

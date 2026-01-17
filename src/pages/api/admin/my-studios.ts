@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro'
 import { getStudioFromSession } from '@/lib/auth'
 import { supabaseAdmin, createSupabaseServerClient } from '@/lib/supabase'
+import { ensureTenantSchema } from '@/lib/tenant'
 
 /**
  * API: /api/admin/my-studios
@@ -82,25 +83,24 @@ export const GET: APIRoute = async ({ request, cookies }) => {
         .eq('studio_id', studioInfo.id)
 
       // Contar clientes del estudio (solo recablix)
-      // Nota: Los clientes están en tenant schema, usamos una función RPC o contamos desde tabla pública
       let clientCount = 0
 
-      // Intentar contar clientes si hay schema_name
-      if (studioInfo.schema_name) {
-        try {
-          // Usamos RPC para contar clientes en tenant schema
-          const { count } = await supabaseAdmin
-            .rpc('count_tenant_clients', {
-              p_schema_name: studioInfo.schema_name,
-              p_app: 'recablix'
-            })
-            .single()
+      try {
+        // Asegurar que el tenant schema existe y obtener su nombre
+        const schemaName = studioInfo.schema_name || await ensureTenantSchema(supabaseAdmin, studioInfo.id)
 
-          clientCount = count || 0
-        } catch {
-          // Si falla la RPC, dejamos clientCount en 0
-          // Esto puede pasar si la función RPC no existe
+        // Usar RPC para contar clientes en tenant schema
+        const { data: countData, error: rpcError } = await supabaseAdmin
+          .rpc('count_tenant_clients', {
+            p_schema_name: schemaName,
+            p_app: 'recablix'
+          })
+
+        if (!rpcError && countData !== null) {
+          clientCount = typeof countData === 'number' ? countData : 0
         }
+      } catch {
+        // Si falla (RPC no existe o error de schema), dejamos clientCount en 0
       }
 
       studiosWithCounts.push({

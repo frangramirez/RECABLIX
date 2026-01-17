@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro'
 import { getStudioFromSession } from '@/lib/auth'
 import { supabaseAdmin } from '@/lib/supabase'
+import { ensureTenantSchema } from '@/lib/tenant'
+import { config as appConfig } from '@/lib/config'
 
 export interface TransactionWithClient {
   id: string
@@ -12,6 +14,18 @@ export interface TransactionWithClient {
   amount: number
   transaction_date: string | null
   description: string | null
+}
+
+/**
+ * Helper para obtener el query builder correcto según el schema
+ */
+function getQueryBuilder(schemaName: string, table: string) {
+  if (!supabaseAdmin) throw new Error('supabaseAdmin not configured')
+
+  if (appConfig.USE_TENANT_SCHEMAS && appConfig.TENANT_TABLES.includes(table as typeof appConfig.TENANT_TABLES[number])) {
+    return supabaseAdmin.schema(schemaName).from(table)
+  }
+  return supabaseAdmin.from(table)
 }
 
 export const GET: APIRoute = async ({ request, cookies, url }) => {
@@ -39,18 +53,21 @@ export const GET: APIRoute = async ({ request, cookies, url }) => {
       )
     }
 
-    // Obtener período activo
+    // Asegurar que el tenant schema existe
+    const schemaName = await ensureTenantSchema(supabaseAdmin, studioId)
+
+    // Obtener período activo (tabla pública)
     const { data: activePeriod } = await supabaseAdmin
       .from('reca_periods')
       .select('sales_period_start, sales_period_end')
       .eq('is_active', true)
       .single()
 
-    // Obtener clientes del estudio con recablix
-    const { data: clients } = await supabaseAdmin
-      .from('clients')
+    // Obtener clientes del estudio con recablix (tabla tenant)
+    // Nota: En tenant schema, clients NO tiene studio_id (el aislamiento es por schema)
+    const clientsQuery = getQueryBuilder(schemaName, 'clients')
+    const { data: clients } = await clientsQuery
       .select('id, name, cuit')
-      .eq('studio_id', studioId)
       .contains('apps', ['recablix'])
       .order('name')
 
@@ -68,9 +85,9 @@ export const GET: APIRoute = async ({ request, cookies, url }) => {
       })
     }
 
-    // Obtener transacciones
-    const { data: transactions, error } = await supabaseAdmin
-      .from('reca_transactions')
+    // Obtener transacciones (tabla tenant)
+    const txQuery = getQueryBuilder(schemaName, 'reca_transactions')
+    const { data: transactions, error } = await txQuery
       .select('*')
       .in('client_id', clientIds)
       .order('period', { ascending: false })
@@ -107,7 +124,7 @@ export const GET: APIRoute = async ({ request, cookies, url }) => {
   }
 }
 
-export const POST: APIRoute = async ({ request, cookies }) => {
+export const POST: APIRoute = async ({ request, cookies, url }) => {
   try {
     const session = await getStudioFromSession(cookies, request)
     if (!session?.is_superadmin) {
@@ -125,10 +142,22 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     const body = await request.json()
-    const { action, data, id } = body
+    const { action, data, id, studioId } = body
+
+    // studioId es requerido para saber en qué tenant schema operar
+    if (!studioId) {
+      return new Response(
+        JSON.stringify({ error: 'studioId requerido' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Asegurar que el tenant schema existe
+    const schemaName = await ensureTenantSchema(supabaseAdmin, studioId)
+    const txQuery = getQueryBuilder(schemaName, 'reca_transactions')
 
     if (action === 'create') {
-      const { error } = await supabaseAdmin.from('reca_transactions').insert(data)
+      const { error } = await supabaseAdmin.schema(schemaName).from('reca_transactions').insert(data)
       if (error) {
         return new Response(
           JSON.stringify({ error: error.message }),
@@ -136,7 +165,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         )
       }
     } else if (action === 'update') {
-      const { error } = await supabaseAdmin.from('reca_transactions').update(data).eq('id', id)
+      const { error } = await supabaseAdmin.schema(schemaName).from('reca_transactions').update(data).eq('id', id)
       if (error) {
         return new Response(
           JSON.stringify({ error: error.message }),
@@ -144,7 +173,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         )
       }
     } else if (action === 'delete') {
-      const { error } = await supabaseAdmin.from('reca_transactions').delete().eq('id', id)
+      const { error } = await supabaseAdmin.schema(schemaName).from('reca_transactions').delete().eq('id', id)
       if (error) {
         return new Response(
           JSON.stringify({ error: error.message }),
@@ -153,7 +182,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       }
     } else if (action === 'bulk_create') {
       const { transactions } = body
-      const { error } = await supabaseAdmin.from('reca_transactions').insert(transactions)
+      const { error } = await supabaseAdmin.schema(schemaName).from('reca_transactions').insert(transactions)
       if (error) {
         return new Response(
           JSON.stringify({ error: error.message }),
