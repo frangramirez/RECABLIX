@@ -220,6 +220,16 @@ export async function ensureTenantSchema(
     .update({ schema_name: expectedSchema })
     .eq('id', studioId)
 
+  // 6. PRD4: Expose schema in PostgREST (defensive, trigger should do this too)
+  try {
+    await supabaseAdmin.rpc('expose_tenant_schema', { p_studio_id: studioId })
+    console.log(`[ensureTenantSchema] Schema exposed in PostgREST: ${expectedSchema}`)
+  } catch (exposeError) {
+    // Non-fatal: log warning but don't throw
+    // The schema works, PostgREST just might not see it until next NOTIFY
+    console.warn('[ensureTenantSchema] expose_tenant_schema failed (non-fatal):', exposeError)
+  }
+
   console.log(`[ensureTenantSchema] Created/ensured schema: ${expectedSchema}`)
 
   return expectedSchema
