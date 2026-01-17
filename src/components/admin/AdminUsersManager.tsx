@@ -465,12 +465,12 @@ export function AdminUsersManager() {
                   Cargando estudios...
                 </div>
               ) : (
-                <Select value={inviteStudioId} onValueChange={setInviteStudioId}>
+                <Select value={inviteStudioId || 'none'} onValueChange={(v) => setInviteStudioId(v === 'none' ? '' : v)}>
                   <SelectTrigger id="invite-studio">
                     <SelectValue placeholder="Sin estudio" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin estudio</SelectItem>
+                    <SelectItem value="none">Sin estudio</SelectItem>
                     {studios.map((studio) => (
                       <SelectItem key={studio.id} value={studio.id}>
                         {studio.name}

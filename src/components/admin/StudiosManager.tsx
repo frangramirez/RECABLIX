@@ -21,7 +21,14 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Plus, Users, FileText, Building2, Download, Upload, UserCog, Pencil, Settings } from 'lucide-react'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Plus, Users, FileText, Building2, Download, Upload, UserCog, Pencil, Settings, Trash2, AlertTriangle, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 import { UsersTab } from './UsersTab'
 import * as XLSX from 'xlsx'
@@ -78,9 +85,33 @@ export function StudiosManager() {
   const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [editActiveTab, setEditActiveTab] = useState('general')
 
+  // Estado para eliminación
+  const [deleteConfirmName, setDeleteConfirmName] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  // Estado para miembros del estudio
+  interface StudioMember {
+    id: string
+    user_id: string
+    email: string
+    role: 'owner' | 'admin' | 'collaborator' | 'client'
+    permissions: Record<string, boolean>
+    created_at: string
+  }
+  const [studioMembers, setStudioMembers] = useState<StudioMember[]>([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [savingMember, setSavingMember] = useState(false)
+
   useEffect(() => {
     fetchStudios()
   }, [])
+
+  // Cargar miembros cuando se abre el tab "members"
+  useEffect(() => {
+    if (editActiveTab === 'members' && editingStudio) {
+      fetchStudioMembers(editingStudio.id)
+    }
+  }, [editActiveTab, editingStudio?.id])
 
   async function fetchStudios() {
     try {
@@ -262,16 +293,21 @@ export function StudiosManager() {
 
     setIsSavingEdit(true)
     try {
-      const { error } = await supabase
-        .from('studios')
-        .update({
+      const response = await fetch(`/api/admin/studios/${editingStudio.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           name: editingStudio.name,
           slug: editingStudio.slug,
           subscription_limits: editingStudio.subscription_limits,
-        })
-        .eq('id', editingStudio.id)
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al actualizar estudio')
+      }
 
       toast.success('Estudio actualizado correctamente')
       setIsEditDialogOpen(false)
@@ -279,13 +315,118 @@ export function StudiosManager() {
       fetchStudios()
     } catch (error: any) {
       console.error('Error updating studio:', error)
-      if (error.code === '23505') {
-        toast.error('El slug ya está en uso por otro estudio')
-      } else {
-        toast.error(error.message || 'Error al actualizar estudio')
-      }
+      toast.error(error.message || 'Error al actualizar estudio')
     } finally {
       setIsSavingEdit(false)
+    }
+  }
+
+  async function handleDeleteStudio() {
+    if (!editingStudio) return
+    if (deleteConfirmName !== editingStudio.name) {
+      toast.error('El nombre ingresado no coincide')
+      return
+    }
+
+    setIsDeleting(true)
+    try {
+      const response = await fetch(`/api/admin/studios/${editingStudio.id}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al eliminar estudio')
+      }
+
+      toast.success(data.message || 'Estudio eliminado correctamente')
+      setIsEditDialogOpen(false)
+      setEditingStudio(null)
+      setDeleteConfirmName('')
+      fetchStudios()
+    } catch (error: any) {
+      console.error('Error deleting studio:', error)
+      toast.error(error.message || 'Error al eliminar estudio')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  async function fetchStudioMembers(studioId: string) {
+    setMembersLoading(true)
+    try {
+      const response = await fetch(`/api/studio/members?studio_id=${studioId}`)
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+      setStudioMembers(data.members || [])
+    } catch (error: any) {
+      console.error('Error fetching members:', error)
+      toast.error(error.message || 'Error al cargar miembros')
+    } finally {
+      setMembersLoading(false)
+    }
+  }
+
+  async function handleUpdateMemberRole(member: StudioMember, newRole: string) {
+    if (member.role === 'owner') {
+      toast.error('No se puede cambiar el rol del owner')
+      return
+    }
+
+    setSavingMember(true)
+    try {
+      const response = await fetch('/api/studio/members', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studio_id: editingStudio?.id,
+          membership_id: member.id,
+          role: newRole,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      toast.success('Rol actualizado')
+      if (editingStudio) fetchStudioMembers(editingStudio.id)
+    } catch (error: any) {
+      console.error('Error updating member:', error)
+      toast.error(error.message || 'Error al actualizar miembro')
+    } finally {
+      setSavingMember(false)
+    }
+  }
+
+  async function handleRemoveMember(member: StudioMember) {
+    if (member.role === 'owner') {
+      toast.error('No se puede eliminar al owner')
+      return
+    }
+
+    if (!confirm(`¿Eliminar a ${member.email} del estudio?`)) return
+
+    try {
+      const response = await fetch('/api/studio/members', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studio_id: editingStudio?.id,
+          membership_id: member.id,
+        }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error)
+
+      toast.success('Miembro eliminado')
+      if (editingStudio) fetchStudioMembers(editingStudio.id)
+      // También actualizamos el contador general
+      fetchStudios()
+    } catch (error: any) {
+      console.error('Error removing member:', error)
+      toast.error(error.message || 'Error al eliminar miembro')
     }
   }
 
@@ -593,7 +734,11 @@ export function StudiosManager() {
             {/* Dialog para editar */}
             <Dialog open={isEditDialogOpen} onOpenChange={(open) => {
               setIsEditDialogOpen(open)
-              if (!open) setEditingStudio(null)
+              if (!open) {
+                setEditingStudio(null)
+                setDeleteConfirmName('')
+                setEditActiveTab('general')
+              }
             }}>
               <DialogContent className="max-w-lg">
                 <DialogHeader>
@@ -608,9 +753,16 @@ export function StudiosManager() {
 
                 {editingStudio && (
                   <Tabs value={editActiveTab} onValueChange={setEditActiveTab}>
-                    <TabsList className="grid w-full grid-cols-2">
+                    <TabsList className="grid w-full grid-cols-4">
                       <TabsTrigger value="general">General</TabsTrigger>
                       <TabsTrigger value="limits">Límites</TabsTrigger>
+                      <TabsTrigger value="members">
+                        <Users className="h-4 w-4 mr-1" />
+                        Miembros
+                      </TabsTrigger>
+                      <TabsTrigger value="danger" className="text-red-600 data-[state=active]:text-red-600">
+                        Eliminar
+                      </TabsTrigger>
                     </TabsList>
 
                     <TabsContent value="general" className="space-y-4 mt-4">
@@ -729,6 +881,107 @@ export function StudiosManager() {
                             placeholder="Ilimitado"
                           />
                         </div>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="members" className="space-y-4 mt-4">
+                      {membersLoading ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          Cargando miembros...
+                        </div>
+                      ) : studioMembers.length === 0 ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          No hay miembros en este estudio
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {studioMembers.map((member) => (
+                            <div
+                              key={member.id}
+                              className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="text-sm">
+                                  <p className="font-medium">{member.email}</p>
+                                  <p className="text-muted-foreground text-xs">
+                                    Desde {new Date(member.created_at).toLocaleDateString('es-AR')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {member.role === 'owner' ? (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
+                                    <Shield className="h-3 w-3 mr-1" />
+                                    Owner
+                                  </Badge>
+                                ) : (
+                                  <>
+                                    <Select
+                                      value={member.role}
+                                      onValueChange={(value) => handleUpdateMemberRole(member, value)}
+                                      disabled={savingMember}
+                                    >
+                                      <SelectTrigger className="w-32 h-8">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="admin">Admin</SelectItem>
+                                        <SelectItem value="collaborator">Colaborador</SelectItem>
+                                        <SelectItem value="client">Cliente</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                      onClick={() => handleRemoveMember(member)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent value="danger" className="space-y-4 mt-4">
+                      <div className="border border-red-200 bg-red-50 rounded-lg p-4 space-y-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
+                          <div>
+                            <h4 className="font-medium text-red-800">Zona de Peligro</h4>
+                            <p className="text-sm text-red-700 mt-1">
+                              Esta acción es irreversible. Se eliminarán todos los datos del estudio,
+                              incluyendo miembros y sus permisos asociados.
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="confirm-delete" className="text-red-700">
+                            Escribí "<span className="font-mono font-bold">{editingStudio.name}</span>" para confirmar
+                          </Label>
+                          <Input
+                            id="confirm-delete"
+                            value={deleteConfirmName}
+                            onChange={(e) => setDeleteConfirmName(e.target.value)}
+                            placeholder="Nombre del estudio"
+                            className="border-red-300 focus:border-red-500"
+                          />
+                        </div>
+
+                        <Button
+                          variant="destructive"
+                          onClick={handleDeleteStudio}
+                          disabled={isDeleting || deleteConfirmName !== editingStudio.name}
+                          className="w-full"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          {isDeleting ? 'Eliminando...' : 'Eliminar Estudio Permanentemente'}
+                        </Button>
                       </div>
                     </TabsContent>
                   </Tabs>

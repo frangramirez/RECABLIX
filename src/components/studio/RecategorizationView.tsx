@@ -31,6 +31,8 @@ interface Props {
   recaCode: string
   salesPeriodStart: string
   salesPeriodEnd: string
+  // Optional: explicit schema name for superadmin viewing other studios
+  schemaName?: string
 }
 
 type ChangeFilter = 'all' | 'UP' | 'DOWN' | 'SAME' | 'NEW'
@@ -40,7 +42,8 @@ export function RecategorizationView({
   recaId,
   recaCode,
   salesPeriodStart,
-  salesPeriodEnd
+  salesPeriodEnd,
+  schemaName
 }: Props) {
   const [results, setResults] = useState<RecategorizationResult[]>([])
   const [loading, setLoading] = useState(true)
@@ -50,11 +53,13 @@ export function RecategorizationView({
   const [selectedClients, setSelectedClients] = useState<Set<string>>(new Set())
   const [generatingPdfs, setGeneratingPdfs] = useState(false)
 
-  // Tenant queries
+  // Tenant queries - use explicit schemaName prop if available, otherwise fall back to session
   const session = useSession()
-  const tenantContext = session.studio
-    ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
-    : null
+  const tenantContext = schemaName
+    ? { studioId, schemaName }
+    : session.studio
+      ? { studioId: session.studio.id, schemaName: session.studio.schema_name }
+      : null
   const { query, publicQuery, isReady } = useTenantSupabase(tenantContext)
 
   // Cache de escalas y componentes para recálculo

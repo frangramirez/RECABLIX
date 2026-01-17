@@ -220,14 +220,38 @@ export async function ensureTenantSchema(
     .update({ schema_name: expectedSchema })
     .eq('id', studioId)
 
-  // 6. PRD4: Expose schema in PostgREST (defensive, trigger should do this too)
-  try {
-    await supabaseAdmin.rpc('expose_tenant_schema', { p_studio_id: studioId })
-    console.log(`[ensureTenantSchema] Schema exposed in PostgREST: ${expectedSchema}`)
-  } catch (exposeError) {
-    // Non-fatal: log warning but don't throw
-    // The schema works, PostgREST just might not see it until next NOTIFY
-    console.warn('[ensureTenantSchema] expose_tenant_schema failed (non-fatal):', exposeError)
+  // 6. PRD4: Expose schema in PostgREST with retry (defensive, trigger should do this too)
+  const MAX_RETRIES = 3
+  let exposeSuccess = false
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    const { error: exposeError } = await supabaseAdmin.rpc('expose_tenant_schema', { p_studio_id: studioId })
+
+    if (!exposeError) {
+      exposeSuccess = true
+      console.log(`[ensureTenantSchema] Schema exposed in PostgREST: ${expectedSchema} (attempt ${attempt})`)
+      break
+    }
+
+    if (attempt < MAX_RETRIES) {
+      console.warn(`[ensureTenantSchema] expose_tenant_schema attempt ${attempt}/${MAX_RETRIES} failed:`, exposeError.message)
+      // Wait a bit before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 100 * attempt))
+    } else {
+      // Final attempt failed - log but don't throw (schema might still work)
+      console.error(`[ensureTenantSchema] expose_tenant_schema failed after ${MAX_RETRIES} attempts:`, exposeError.message)
+      console.warn(`[ensureTenantSchema] Schema ${expectedSchema} may not be accessible via PostgREST`)
+    }
+  }
+
+  // If expose failed, try a fallback: verify schema exists by querying pg_namespace
+  if (!exposeSuccess) {
+    const { data: schemaExists } = await supabaseAdmin
+      .rpc('check_schema_exists', { schema_name: expectedSchema })
+
+    if (schemaExists) {
+      console.warn(`[ensureTenantSchema] Schema ${expectedSchema} exists but not exposed. Queries may fail.`)
+    }
   }
 
   console.log(`[ensureTenantSchema] Created/ensured schema: ${expectedSchema}`)

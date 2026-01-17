@@ -23,7 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Search, Shield, Building2, User, Pencil, Trash2, Settings } from 'lucide-react'
+import { Search, Shield, Building2, User, Pencil, Trash2, Settings, ChevronDown, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
@@ -71,6 +71,9 @@ export function UsersTab() {
   const [selectedStudio, setSelectedStudio] = useState<string>('')
   const [studios, setStudios] = useState<{ id: string; name: string }[]>([])
   const [selectedUser, setSelectedUser] = useState<UserWithRoles | null>(null)
+
+  // Estado para fila expandida inline
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null)
 
   // Estado para edición de permisos
   const [editingMembership, setEditingMembership] = useState<EditingMembership | null>(null)
@@ -310,53 +313,133 @@ export function UsersTab() {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredUsers.map((user) => (
-                <TableRow
-                  key={user.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => setSelectedUser(user)}
-                >
-                  <TableCell className="font-medium">{user.email}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.name || '-'}
-                  </TableCell>
-                  <TableCell>
-                    {user.studios.length === 0 ? (
-                      <span className="text-muted-foreground">Sin estudio</span>
-                    ) : user.studios.length === 1 ? (
-                      <div className="flex items-center gap-1">
-                        <Building2 className="h-3 w-3 text-muted-foreground" />
-                        <span>{user.studios[0].studio_name}</span>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">
-                        {user.studios.length} estudios
-                      </Badge>
+              filteredUsers.map((user) => {
+                const isExpanded = expandedUserId === user.id
+                return (
+                  <>
+                    <TableRow
+                      key={user.id}
+                      className={`cursor-pointer hover:bg-muted/50 ${isExpanded ? 'bg-muted/30' : ''}`}
+                      onClick={() => setExpandedUserId(isExpanded ? null : user.id)}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          {user.email}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.name || '-'}
+                      </TableCell>
+                      <TableCell>
+                        {user.studios.length === 0 ? (
+                          <span className="text-muted-foreground">Sin estudio</span>
+                        ) : user.studios.length === 1 ? (
+                          <div className="flex items-center gap-1">
+                            <Building2 className="h-3 w-3 text-muted-foreground" />
+                            <span>{user.studios[0].studio_name}</span>
+                          </div>
+                        ) : (
+                          <Badge variant="outline">
+                            {user.studios.length} estudios
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {user.studios.length === 0 ? (
+                          '-'
+                        ) : user.studios.length === 1 ? (
+                          <Badge variant={getRoleBadgeVariant(user.studios[0].role)}>
+                            {user.studios[0].role}
+                          </Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">
+                            (ver detalle)
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {user.is_superadmin && (
+                          <Shield className="h-4 w-4 mx-auto text-amber-500" />
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {formatDate(user.last_sign_in_at)}
+                      </TableCell>
+                    </TableRow>
+                    {/* Fila expandida con detalle de estudios */}
+                    {isExpanded && (
+                      <TableRow key={`${user.id}-expanded`} className="bg-muted/20 hover:bg-muted/20">
+                        <TableCell colSpan={6} className="py-4">
+                          <div className="pl-6 space-y-3">
+                            <div className="flex items-center gap-4 text-sm">
+                              <span className="text-muted-foreground">Último login:</span>
+                              <span>{formatDate(user.last_sign_in_at)}</span>
+                              <span className="text-muted-foreground ml-4">Registrado:</span>
+                              <span>{formatDate(user.created_at)}</span>
+                            </div>
+                            {user.studios.length === 0 ? (
+                              <p className="text-sm text-muted-foreground italic">
+                                Este usuario no pertenece a ningún estudio
+                              </p>
+                            ) : (
+                              <div className="space-y-2">
+                                <h4 className="text-sm font-medium flex items-center gap-2">
+                                  <Building2 className="h-4 w-4" />
+                                  Membresías ({user.studios.length})
+                                </h4>
+                                <div className="grid gap-2">
+                                  {user.studios.map((studio) => (
+                                    <div
+                                      key={studio.membership_id}
+                                      className="flex items-center justify-between p-3 bg-background rounded-md border"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <span className="font-medium">{studio.studio_name}</span>
+                                        <Badge variant={getRoleBadgeVariant(studio.role)}>
+                                          {studio.role}
+                                        </Badge>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            openEditPermissions(studio)
+                                          }}
+                                        >
+                                          <Settings className="h-4 w-4 mr-1" />
+                                          Permisos
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleDeleteMembership(studio.membership_id, studio.studio_name)
+                                          }}
+                                        >
+                                          <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {user.studios.length === 0 ? (
-                      '-'
-                    ) : user.studios.length === 1 ? (
-                      <Badge variant={getRoleBadgeVariant(user.studios[0].role)}>
-                        {user.studios[0].role}
-                      </Badge>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">
-                        (ver detalle)
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    {user.is_superadmin && (
-                      <Shield className="h-4 w-4 mx-auto text-amber-500" />
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(user.last_sign_in_at)}
-                  </TableCell>
-                </TableRow>
-              ))
+                  </>
+                )
+              })
             )}
           </TableBody>
         </Table>

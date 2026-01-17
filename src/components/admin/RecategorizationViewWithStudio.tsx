@@ -89,8 +89,7 @@ export function RecategorizationViewWithStudio({ studioId, schemaName }: Props) 
   }
 
   // Renderizar la vista de recategorización con el período activo
-  // Nota: RecategorizationView ya usa useTenantSupabase con useSession internamente
-  // pero aquí forzamos el contexto pasando studioId
+  // Pasamos schemaName para usar el tenant correcto (especialmente para superadmins)
   return (
     <div className="space-y-4">
       <div className="bg-muted/50 rounded-lg p-4">
@@ -102,6 +101,7 @@ export function RecategorizationViewWithStudio({ studioId, schemaName }: Props) 
 
       <RecategorizationView
         studioId={studioId}
+        schemaName={schemaName}
         recaId={activePeriod.id}
         recaCode={activePeriod.code}
         salesPeriodStart={activePeriod.sales_period_start}

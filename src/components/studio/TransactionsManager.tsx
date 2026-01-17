@@ -32,6 +32,14 @@ interface Props {
   schemaName?: string
 }
 
+// Derive period (YYYYMM) from a date string
+function derivePeriod(dateString: string): string {
+  const d = new Date(dateString)
+  const year = d.getFullYear()
+  const month = String(d.getMonth() + 1).padStart(2, '0')
+  return `${year}${month}`
+}
+
 export function TransactionsManager({ clientId, activePeriod, studioId, schemaName }: Props) {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
@@ -39,6 +47,15 @@ export function TransactionsManager({ clientId, activePeriod, studioId, schemaNa
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   const { toast } = useToast()
+
+  // Form state for controlled inputs
+  const [formData, setFormData] = useState({
+    type: 'SALE' as 'SALE' | 'PURCHASE',
+    period: '',
+    amount: '',
+    date: '',
+    description: '',
+  })
 
   // Tenant queries - use props if available, otherwise fall back to session
   const session = useSession()
@@ -54,6 +71,39 @@ export function TransactionsManager({ clientId, activePeriod, studioId, schemaNa
       fetchTransactions()
     }
   }, [isReady])
+
+  // Initialize form when dialog opens or editing changes
+  useEffect(() => {
+    if (isDialogOpen) {
+      if (editingTransaction) {
+        setFormData({
+          type: editingTransaction.transaction_type,
+          period: editingTransaction.period,
+          amount: String(editingTransaction.amount),
+          date: editingTransaction.transaction_date || '',
+          description: editingTransaction.description || '',
+        })
+      } else {
+        setFormData({
+          type: 'SALE',
+          period: '',
+          amount: '',
+          date: '',
+          description: '',
+        })
+      }
+    }
+  }, [isDialogOpen, editingTransaction])
+
+  // Auto-calculate period when date changes
+  const handleDateChange = (dateValue: string) => {
+    setFormData(prev => ({
+      ...prev,
+      date: dateValue,
+      // Auto-populate period only if it's empty or matches the previous date's period
+      period: dateValue ? derivePeriod(dateValue) : prev.period,
+    }))
+  }
 
   const fetchTransactions = async () => {
     const { data, error } = await query('reca_transactions')
@@ -72,15 +122,14 @@ export function TransactionsManager({ clientId, activePeriod, studioId, schemaNa
 
   const handleSave = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
-    const formData = new FormData(e.currentTarget)
 
     const data = {
       client_id: clientId,
-      transaction_type: formData.get('type') as 'SALE' | 'PURCHASE',
-      period: formData.get('period') as string,
-      amount: parseFloat(formData.get('amount') as string),
-      transaction_date: (formData.get('date') as string) || null,
-      description: (formData.get('description') as string) || null,
+      transaction_type: formData.type,
+      period: formData.period,
+      amount: parseFloat(formData.amount),
+      transaction_date: formData.date || null,
+      description: formData.description || null,
     }
 
     let error
@@ -243,7 +292,12 @@ export function TransactionsManager({ clientId, activePeriod, studioId, schemaNa
             <form onSubmit={handleSave} className="space-y-4">
               <div>
                 <Label>Tipo *</Label>
-                <Select name="type" defaultValue={editingTransaction?.transaction_type || 'SALE'}>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value: 'SALE' | 'PURCHASE') =>
+                    setFormData(prev => ({ ...prev, type: value }))
+                  }
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="SALE">Venta</SelectItem>
@@ -252,25 +306,45 @@ export function TransactionsManager({ clientId, activePeriod, studioId, schemaNa
                 </Select>
               </div>
               <div>
+                <Label htmlFor="date">Fecha</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                />
+                <p className="text-xs text-gray-500 mt-1">El período se calcula automáticamente</p>
+              </div>
+              <div>
                 <Label htmlFor="period">Período (YYYYMM) *</Label>
-                <Input id="period" name="period" defaultValue={editingTransaction?.period || ''}
-                  placeholder="202501" maxLength={6} required />
+                <Input
+                  id="period"
+                  value={formData.period}
+                  onChange={(e) => setFormData(prev => ({ ...prev, period: e.target.value }))}
+                  placeholder="202501"
+                  maxLength={6}
+                  required
+                />
               </div>
               <div>
                 <Label htmlFor="amount">Monto ($) *</Label>
-                <Input id="amount" name="amount" type="number" step="0.01"
-                  defaultValue={editingTransaction?.amount || ''} required />
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  value={formData.amount}
+                  onChange={(e) => setFormData(prev => ({ ...prev, amount: e.target.value }))}
+                  required
+                />
                 <p className="text-xs text-gray-500 mt-1">Usar negativo para NC</p>
               </div>
               <div>
-                <Label htmlFor="date">Fecha</Label>
-                <Input id="date" name="date" type="date"
-                  defaultValue={editingTransaction?.transaction_date || ''} />
-              </div>
-              <div>
                 <Label htmlFor="description">Descripción</Label>
-                <Input id="description" name="description"
-                  defaultValue={editingTransaction?.description || ''} />
+                <Input
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                />
               </div>
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>

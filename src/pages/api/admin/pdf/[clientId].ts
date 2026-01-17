@@ -76,7 +76,18 @@ export const GET: APIRoute = async ({ params, cookies, request, url }) => {
     .single()
 
   if (clientError || !clientWithData) {
-    return new Response('Client not found', { status: 404 })
+    console.error('[PDF] Client query failed:', { clientError, clientId, schemaName })
+    const errorDetail = clientError
+      ? `Query error: ${clientError.message}`
+      : 'Client not found in tenant schema'
+    return new Response(JSON.stringify({
+      error: 'Client not found',
+      detail: errorDetail,
+      hint: 'The tenant schema may not be properly exposed to PostgREST. Try refreshing the page.',
+    }), {
+      status: 404,
+      headers: { 'Content-Type': 'application/json' },
+    })
   }
 
   // Obtener nombre del studio

@@ -194,20 +194,45 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       )
     }
 
-    const targetUser = users.users.find(
+    let targetUser = users.users.find(
       u => u.email?.toLowerCase() === email.toLowerCase()
     )
 
+    let userCreated = false
+    let invitationSent = false
+
+    // Si el usuario no existe, crearlo e invitar por email
     if (!targetUser) {
-      return new Response(
-        JSON.stringify({
-          error: 'Usuario no encontrado. El email debe corresponder a una cuenta registrada.',
-        }),
-        {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
+      try {
+        const { data: newUser, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+          redirectTo: `${new URL(request.url).origin}/auth/confirm`,
+        })
+
+        if (inviteError) {
+          console.error('Error inviting user:', inviteError)
+          return new Response(
+            JSON.stringify({ error: `Error al invitar usuario: ${inviteError.message}` }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+          )
         }
-      )
+
+        if (!newUser.user) {
+          return new Response(
+            JSON.stringify({ error: 'No se pudo crear el usuario' }),
+            { status: 500, headers: { 'Content-Type': 'application/json' } }
+          )
+        }
+
+        targetUser = newUser.user
+        userCreated = true
+        invitationSent = true
+      } catch (err) {
+        console.error('Error creating user:', err)
+        return new Response(
+          JSON.stringify({ error: 'Error al crear usuario' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
     // Verificar que no sea ya miembro del studio
@@ -338,6 +363,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       })
     }
 
+    // Construir mensaje apropiado
+    let message = 'Miembro agregado correctamente'
+    if (userCreated && invitationSent) {
+      message = 'Usuario creado e invitación enviada por email. Se agregó como miembro.'
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -345,6 +376,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
           ...newMember,
           email: targetUser.email,
         },
+        user_created: userCreated,
+        invitation_sent: invitationSent,
+        message,
       }),
       {
         status: 201,
